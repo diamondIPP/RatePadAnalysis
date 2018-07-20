@@ -8,7 +8,7 @@ from sys import stdout
 from json import loads
 
 from ROOT import TGraphErrors, TCanvas, TH2D, gStyle, TH1F, gROOT, TLegend, TCut, TGraph, TProfile2D, TH2F, TProfile, TCutG, kGreen, TF1, \
-    THStack, TArrow, kOrange, TSpectrum, TMultiGraph, Long, TH2I, gRandom
+    THStack, TArrow, kOrange, TSpectrum, TMultiGraph, Long, TH2I, gRandom, TSpectrum
 
 from CutPad import CutPad
 from CurrentInfo import Currents
@@ -21,6 +21,10 @@ from Peaks import PeakAnalysis
 from Timing import TimingAnalysis
 from Run import Run
 from Utils import *
+
+import numpy as np
+from array import array
+import matplotlib.pyplot as plt
 
 __author__ = 'micha'
 
@@ -72,6 +76,10 @@ class PadAnalysis(Analysis):
             self.Pedestal = PedestalAnalysis(self)
             self.Peaks = PeakAnalysis(self)
             self.Timing = TimingAnalysis(self)
+
+            # class variables
+            self.nsamp = 1024 #samples in waveform
+
 
         # currents
         self.Currents = Currents(self)
@@ -1622,6 +1630,283 @@ class PadAnalysis(Analysis):
 
     # ============================================
     # region MISCELLANEOUS
+
+    def indexes(self,y, thres=0.3, min_dist=1):
+        '''Peak detection routine.
+        Finds the peaks in *y* by taking its first order difference. By using
+        *thres* and *min_dist* parameters, it is possible to reduce the number of
+        detected peaks.'''
+
+        thres *= np.max(y)
+        # find the peaks by using the first order difference
+        dy = np.diff(y)
+        peaks = np.where((np.hstack([dy, 0.]) < 0.)
+                         & (np.hstack([0., dy]) > 0.)
+                         & (y > thres))[0]
+
+        if peaks.size > 1 and min_dist > 1:
+            highest = peaks[np.argsort(y[peaks])][::-1]
+            rem = np.ones(y.size, dtype=bool)
+            rem[peaks] = False
+
+            for peak in highest:
+                if not rem[peak]:
+                    sl = slice(max(0, peak - min_dist), peak + min_dist + 1)
+                    rem[sl] = True
+                    rem[peak] = False
+
+            peaks = np.arange(y.size)[~rem]
+
+        #in case of signal saturation
+        if len(peaks) == 0:
+            idx = np.argmax(y)
+            peaks = np.array([idx])
+        return peaks
+
+    def do_peak_finding(self, cut=None, start_event=None, channel=None, show=True):
+        channel = self.channel if channel is None else channel
+        #print 'channel', channel
+        if not self.run.wf_exists(self.channel):
+            return
+
+        cut = self.Cut.all_cut if cut is None else TCut(cut)
+
+        #get all the events after the usual cuts:
+        total_events = self.tree.Draw('event_number', cut, 'goff', self.run.n_entries, 1)
+        evt_numbers = [int(self.tree.GetV1()[i]) for i in xrange(total_events)]
+        #print 'Number of events before cuts: ', self.tree.GetEntries()
+        #print 'Number of events left after cuts: ', len(evt_numbers)
+        signal_region = [80,100] #in bins
+
+
+        accepted = []
+        rejected = []
+        signals = []
+
+        figa, axa = plt.subplots()
+        axa.set_xlabel('Time [ns]', fontsize=11)
+        axa.set_ylabel('Signal [mV]', fontsize=11)
+        axa.set_title('Accepted Scintillator Signals')
+
+        figr, axr = plt.subplots()
+        axr.set_xlabel('Time [ns]', fontsize=11)
+        axr.set_ylabel('Signal [mV]', fontsize=11)
+        axr.set_title('Rejected Scintillator Signals')
+
+        figd, axd = plt.subplots()
+        axd.set_xlabel('Time [ns]', fontsize=11)
+        axd.set_ylabel('Signal [mV]', fontsize=11)
+        axd.set_title('Diamond Waveforms')
+
+        figh, axh = plt.subplots()
+        axh.set_xlabel('Scintillator Amplitude [mV]', fontsize=11)
+        axh.set_ylabel('Entries', fontsize=11)
+        axh.set_title('Histogram')
+
+        plt.ion()
+        sat = 0
+        for ev in evt_numbers[1000:2000]:
+            self.tree.SetEstimate(self.nsamp)
+            n_entries = self.tree.Draw('wf{ch}:trigger_cell'.format(ch=channel), cut, 'goff', 1, ev)
+            values_ptr = self.tree.GetV1()
+            values = np.zeros(n_entries)
+            for idx in xrange(n_entries):
+                values[idx] = values_ptr[idx]*(-1) #reverse sign - DRS4 spikes are going to be negative and scintillator signals positive
+
+            times = self.run.get_calibrated_times(self.tree.GetV2()[self.nsamp])
+            times = np.array(times)
+            self.tree.SetEstimate()
+
+            pks = self.indexes(values, thres=0.3, min_dist=5)
+
+            if len(pks) > 1:
+                axr.plot(times, values, 'k', lw=0.4)
+                axr.plot(times[pks], values[pks], 'r+', ms=5, mew=2)
+                rejected.append(ev)
+                continue
+
+            if values[pks[0]] > 499: #no interest in saturated events
+                sat += 1
+
+
+            signals.append(values[pks[0]])
+
+            if pks[0] < signal_region[0] or pks[0] > signal_region[1]:
+                axr.plot(times, values, 'k', lw=0.4)
+                axr.plot(times[pks], values[pks], 'r+', ms=5, mew=2)
+                rejected.append(ev)
+                continue
+
+
+            axa.plot(times, values, 'k', lw=0.4)
+            axa.plot(times[pks], values[pks], 'r+', ms=5, mew=2)
+            accepted.append(ev)
+
+        print 'Accepted: ', len(accepted)
+        print 'Rejected: ', len(rejected)
+        print 'Saturated: ', sat
+
+        for a in rejected:
+            self.tree.SetEstimate(self.nsamp)
+            n_entries = self.tree.Draw('wf{ch}:trigger_cell'.format(ch=0), cut, 'goff', 1, a)
+            values_ptr = self.tree.GetV1()
+            values = np.zeros(n_entries)
+            for idx in xrange(n_entries):
+                values[idx] = values_ptr[idx]
+            times = self.run.get_calibrated_times(self.tree.GetV2()[self.nsamp])
+            times = np.array(times)
+            self.tree.SetEstimate()
+
+            axd.plot(times, values, 'k', lw=0.2)
+
+        n, bins, patches = axh.hist(signals, 60, density=True, facecolor='g', alpha=0.75)
+
+        figa.show()
+        figr.show()
+        figd.show()
+        figh.show()
+
+
+    def plot_scint_peaks(self, cut=None, start_event=0, n_events=11):
+        fig, ax = plt.subplots()
+        ax.set_xlabel('Time [ns]', fontsize=11)
+        ax.set_ylabel('Signal [mV]', fontsize=11)
+        ax.set_title('Scintillator Signals')
+
+        if start_event+n_events > self.tree.GetEntries():
+            return
+
+        for i in xrange(start_event, n_events, 1):
+            self.tree.GetEntry(i)
+            print 'Event ', self.tree.event_number
+
+            #get waveforms
+            wf2 = [-1.0*e for e in self.tree.wf2]
+            times = self.run.get_calibrated_times(self.tree.trigger_cell)
+            ax.plot(times, wf2, 'k', lw=0.2)
+
+            tmp_t = [int(e) for e in self.tree.peaks2_x]
+            peaks_t = [times[e] for e in tmp_t]
+            peaks_y = [e for e in self.tree.peaks2_y]
+            ax.plot(peaks_t, peaks_y, 'r+')
+
+
+        fig.show()
+
+
+
+
+
+    def plot_peaks(self, cut=None, start_event=0, n_events=11, channel=2, show=True):
+        channel = self.channel if channel is None else channel
+        if not self.run.wf_exists(self.channel):
+            return
+        cut = self.Cut.all_cut if cut is None else TCut(cut)
+        cut = ''
+        nsamp = 1024
+
+
+
+        #get the peaks
+        peaks_x = []
+        peaks_y = []
+        nEntries = self.tree.Draw('event_number:@peaks{ch}_x.size():peaks{ch}_x:peaks{ch}_y'.format(ch=channel), cut, 'para goff', n_events, start_event)
+        idx = 0
+        while idx < nEntries:
+            ev = int(self.tree.GetVal(0)[idx])
+            pks = int(self.tree.GetVal(1)[idx])
+
+            print 'Idx:', idx, ' event: ', ev, ' peaks: ', pks
+            x = []
+            y = []
+            for i in xrange(pks):
+                idx = idx + i
+                x.append(int(self.tree.GetVal(2)[idx]))
+                y.append(self.tree.GetVal(3)[idx])
+            peaks_x.append(x)
+            peaks_y.append(y)
+            idx = idx + 1
+
+
+        #get the waveforms
+        self.tree.SetEstimate(n_events*nsamp)
+        nEntries = self.tree.Draw('wf{ch}:trigger_cell'.format(ch=channel), cut, 'para goff', idx, start_event)
+        values_ptr = self.tree.GetV1()
+        values = np.zeros(nEntries)
+        for idx in xrange(nEntries):
+            values[idx] = values_ptr[idx] * (-1)  # reverse sign - DRS4 spikes are going to be negative and scintillator signals positive
+
+        times = [self.run.get_calibrated_times(self.tree.GetV2()[1024 * i]) for i in xrange(nEntries / nsamp)]
+        times = [v for lst in times for v in lst]
+        self.tree.SetEstimate()
+
+        fig, ax = plt.subplots()
+        ax.set_xlabel('Time [ns]', fontsize=11)
+        ax.set_ylabel('Signal [mV]', fontsize=11)
+        ax.set_title('Scintillator Signals')
+
+        print len(peaks_x)
+        print n_events
+        for i in xrange(n_events):
+            ax.plot(times[i*nsamp:(i+1)*nsamp], values[i*nsamp:(i+1)*nsamp], 'k', lw=0.4)
+            print peaks_x[i]
+            #px = [times[e] for e in peaks_x[i]]
+            #ax.plot(px, peaks_y[i], 'r+')
+
+
+        fig.show()
+
+
+        '''
+            #pks = int(self.tree.GetVal(3)[idx])
+
+            #if pks == 0:
+            #    print 'Peak finding failed for event {ev}!'.format(ev=ev)
+            #    continue
+
+            #print 'Event {ev} with {pks} peaks (idx={idx})'.format(ev=ev, pks=pks, idx=idx)
+
+            evnr.append(ev)
+            vals = []
+            ptr = self.tree.GetVal(1)
+            for s in xrange(idx * nsamp, (idx + 1) * nsamp):
+                val = ptr[s]
+                vals.append(val)
+                #print s, val
+
+
+
+            wf.append(vals)
+
+            timeax.append(tax)
+            #npeaks.append(pks)
+
+            ax.plot(tax, vals, 'k', lw=0.4)
+
+
+            x = []
+            y = []
+            #for p in xrange(pks):
+
+             #   x.append(self.tree.GetVal(4)[idx+p])
+             #   y.append(self.tree.GetVal(5)[idx+p])
+
+            #pksx.append(x)
+            #pksy.append(y)
+
+            idx += nsamp
+
+
+        fig.show()
+
+
+
+        #:@peaks{ch}_x.size():peaks{ch}_x:peaks{ch}_y
+
+        '''
+
+
+
     def get_cut(self):
         """ :return: full cut_string """
         return self.Cut.all_cut
