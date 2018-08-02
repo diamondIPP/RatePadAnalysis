@@ -54,7 +54,7 @@ class AutoConvert:
             run_infos = {int(key): value for key, value in self.Run.load_run_info_file().iteritems()}
             if run not in run_infos:
                 return False
-            system('cvlc --play-and-exit ~/Downloads/closing_time.mp3 --run-time=60')
+            #system('cvlc --play-and-exit ~/Downloads/closing_time.mp3 --run-time=60')
             Run(run, self.Run.TCString)
             self.save_last_converted(run)
             self.NextRun += 1
