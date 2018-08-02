@@ -1771,22 +1771,25 @@ class PadAnalysis(Analysis):
         fig, ax = plt.subplots()
         ax.set_xlabel('Time [ns]', fontsize=11)
         ax.set_ylabel('Signal [mV]', fontsize=11)
-        ax.set_title('Scintillator Signals')
+        ax.set_title('Inverted Scintillator Signal(s)')
 
-        if start_event+n_events > self.tree.GetEntries():
+        ulim = start_event+n_events
+        if ulim > self.tree.GetEntries():
             return
 
-        for i in xrange(start_event, n_events, 1):
+        for i in xrange(start_event, ulim, 1):
             self.tree.GetEntry(i)
             print 'Event ', self.tree.event_number
 
             #get waveforms
             wf2 = [-1.0*e for e in self.tree.wf2]
-            times = self.run.get_calibrated_times(self.tree.trigger_cell)
+            trg_cell = self.tree.trigger_cell
+            times = self.run.get_calibrated_times(trg_cell)
             ax.plot(times, wf2, 'k', lw=0.2)
 
-            tmp_t = [int(e) for e in self.tree.peaks2_x]
-            peaks_t = [times[e] for e in tmp_t]
+            #tmp_t = [int(e) for e in self.tree.peaks2_x]
+            #peaks_t = [times[e] for e in tmp_t]
+            peaks_t = [e for e in self.tree.peaks2_x_time]
             peaks_y = [e for e in self.tree.peaks2_y]
             ax.plot(peaks_t, peaks_y, 'r+')
         fig.show()
