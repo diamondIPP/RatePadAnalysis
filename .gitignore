@@ -1,3 +1,7 @@
+.DS_Store
+._.DS_Store
+Configuration/.DS_Store
+Configuration/._.DS_Store
 *.pyc
 Results*
 Plots*/
