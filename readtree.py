@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from ROOT import TFile, gROOT, TGraph, TH2F, gStyle, TCanvas, TCut, TH1F, kRed, TMultiGraph
+from ROOT import TFile, gROOT, TGraph, TH2F, gStyle, TCanvas, TCut, TH1F
 from sys import argv
 from AbstractClasses.Utils import *
 from json import load
@@ -11,10 +11,6 @@ from progressbar import Bar, ETA, FileTransferSpeed, Percentage, ProgressBar
 from argparse import ArgumentParser
 from os import chdir, system
 from os.path import dirname
-import numpy as np
-import matplotlib.pyplot as plt
-
-
 
 widgets = ['Progress: ', Percentage(), ' ', Bar(marker='>'), ' ', ETA(), ' ', FileTransferSpeed()]
 
@@ -99,6 +95,7 @@ def draw_waveforms(n=1000, start_event=0, cut_string='', show=True, fixed_range=
     count += n_events
     return h, n_events
 
+
 def show_single_waveforms(n=1, cut='', start_event=0):
     global count
     start = start_event + count
@@ -127,72 +124,6 @@ def show_single_waveforms(n=1, cut='', start_event=0):
     # if cnt is None:
     #     return
     count += cnt
-
-
-
-
-
-def tspectrum_waveforms(n=1, cut='', start_event=0, ch=2):
-    global count
-    start = start_event + count
-    print 'Event number: {evnr} - Drawing waveform of channel {ch}'.format(evnr=start, ch=ch)
-
-    #t.SetEstimate(-1);
-    #get waveform
-    #gStyle.SetPalette(55)
-    #t.Draw('wf{ch}:Iteration$'.format(ch=ch), cut, 'goff', n, start)
-    #wfs = TGraph(t.GetSelectedRows(), t.GetV2(), t.GetV1())
-    #run.format_histo(wfs, title='Waveform', name='wf', x_tit='Time [ns]', y_tit='Signal [mV]', markersize=.4, y_off=.8, stats=0, tit_size=.05)
-    #wfs.Draw("AL")
-
-    #get peak information
-    #t.Draw("@peaks0_x.size():peaks0_x:peaks0_y", "", "goff",1,start)
-    #t.Draw("peaks0_x:@peaks0_x.size()", "", "goff")
-    #ptr = t.GetV2()
-    #for i in range(10000):
-    #    if ptr[0] > 1:
-    #        print 'HI', ptr[0]
-
-    plt.ion()
-
-    wfs = []
-    npts = []
-    px = []
-    py = []
-    time = np.linspace(0,512,1024)
-
-    #times = [run.get_calibrated_times(self.tree.GetV2()[1024 * i]) for i in xrange(n_entries / 1024)]
-
-    for i, ev in enumerate(t):
-        wfs.append([e for e in ev.wf2])
-        npts.append(len(ev.peaks2_x))
-        px.append([e for e in ev.peaks2_x])
-        py.append([e*-1  for e in ev.peaks2_y])
-
-        if i > 2000:
-            break
-    print npts
-
-
-    fig, ax = plt.subplots()
-    ax.set_xlabel('Time',fontsize=11)
-    ax.set_ylabel('Amplitude' ,fontsize=11)
-    ax.set_title('Scintillator Signal')
-
-
-    cnt = 0
-    for i in range(len(wfs)):
-        if npts[i] > 1:
-            ax.plot(time, wfs[i], 'k', lw=0.2)
-            ax.plot(px[i], py[i], 'r+')
-            print npts[i]
-            cnt += 1
-
-        if cnt > 200:
-            break
-
-    fig.show()
-
 
 
 def find_n_events(n, cut, start):
