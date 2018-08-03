@@ -1767,16 +1767,16 @@ class PadAnalysis(Analysis):
         figh.show()
 
 
-    def plot_scint_peaks(self, cut=None, start_event=0, n_events=11):
+    def plot_scint_peaks(self, cut=None, start_event=1, n=10):
         fig, ax = plt.subplots()
         ax.set_xlabel('Time [ns]', fontsize=11)
         ax.set_ylabel('Signal [mV]', fontsize=11)
         ax.set_title('Scintillator Signals')
 
-        if start_event+n_events > self.tree.GetEntries():
+        if start_event+n > self.tree.GetEntries():
             return
 
-        for i in xrange(start_event, n_events, 1):
+        for i in xrange(start_event, start_event+n, 1):
             self.tree.GetEntry(i)
             print 'Event ', self.tree.event_number
 
@@ -1785,8 +1785,9 @@ class PadAnalysis(Analysis):
             times = self.run.get_calibrated_times(self.tree.trigger_cell)
             ax.plot(times, wf2, 'k', lw=0.2)
 
-            tmp_t = [int(e) for e in self.tree.peaks2_x]
-            peaks_t = [times[e] for e in tmp_t]
+            #tmp_t = [int(e) for e in self.tree.peaks2_x]
+            #peaks_t = [times[e] for e in tmp_t]
+            peaks_t = [e for e in self.tree.peaks2_x_time]
             peaks_y = [e for e in self.tree.peaks2_y]
             ax.plot(peaks_t, peaks_y, 'r+')
         fig.show()
