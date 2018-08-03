@@ -88,6 +88,7 @@ class Cut(Elementary):
         dic['absMedian_high'] = ''
         dic['pedestalsigma'] = ''
         dic['alignment'] = ''
+        dic['scintillator'] = ''
         return dic
     
     @staticmethod
@@ -115,6 +116,8 @@ class Cut(Elementary):
         dic['timing'] = TCut('timing', '')
         dic['old_bucket'] = TCut('old_bucket', '')
         dic['bucket'] = TCut('bucket', '')
+        #scintillator signal
+        dic['scint_x_time'] = TCut('scint_x_time', '') #scintillator peaks
         # tracks
         dic['hit'] = TCut('hit', '')
         dic['masks'] = TCut('masks', '')
@@ -280,6 +283,11 @@ class Cut(Elementary):
         # -- BEAM INTERRUPTION CUT --
         self.CutStrings['beam_interruptions'] += self.generate_beam_interruptions()
         self.JumpCut += self.generate_jump_cut()
+
+        # -- SCINTILLATOR CUT --
+        self.CutStrings['scint_x_time'] += '@peaks2_x_time.size()==1'  # anzahl peaks = 1
+        #self.CutStrings['scint_x_time'] += 'peaks2_x_time>41&&peaks2_x_time<49'  # peak position = [x, y]
+
 
         gROOT.SetBatch(0)
 
