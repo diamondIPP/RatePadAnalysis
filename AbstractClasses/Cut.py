@@ -2,6 +2,8 @@ import json
 from numpy import zeros
 from Elementary import Elementary
 from InfoLegend import InfoLegend
+import ROOT as r
+r.PyConfig.IgnoreCommandLineOptions = True
 from ROOT import TCut, gROOT, TH1F, TPie
 from Utils import *
 from Plots import Plots
@@ -117,7 +119,9 @@ class Cut(Elementary):
         dic['old_bucket'] = TCut('old_bucket', '')
         dic['bucket'] = TCut('bucket', '')
         #scintillator signal
-        dic['scint_x_time'] = TCut('scint_x_time', '') #scintillator peaks
+        dic['n_scint_peaks'] = TCut('scint_x_time', '') #scintillator peaks
+        #dic['scint_peaks_before'] = TCut('scint_peaks_before', '') #region cut on scintillator signal
+        #dic['scint_peaks_after'] = TCut('scint_peaks_after', '')
         # tracks
         dic['hit'] = TCut('hit', '')
         dic['masks'] = TCut('masks', '')
@@ -285,8 +289,9 @@ class Cut(Elementary):
         self.JumpCut += self.generate_jump_cut()
 
         # -- SCINTILLATOR CUT --
-        self.CutStrings['scint_x_time'] += '@peaks2_x_time.size()==1'  # anzahl peaks = 1
-        #self.CutStrings['scint_x_time'] += 'peaks2_x_time>41&&peaks2_x_time<49'  # peak position = [x, y]
+        self.CutStrings['n_scint_peaks'] += '(@peaks2_x_time.size()==1)'  # number of peaks = 1
+        #self.CutStrings['scint_peaks_after'] += '(Sum$(peaks2_x_time>50)==0)'  # peak positions before region
+        #self.CutStrings['scint_peaks_before'] += '(Sum$(peaks2_x_time<41)==0)'  # peak positions after region
 
 
         gROOT.SetBatch(0)

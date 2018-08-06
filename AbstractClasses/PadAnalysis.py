@@ -1300,6 +1300,7 @@ class PadAnalysis(Analysis):
         start_event = self.count + self.StartEvent if start_event is None else start_event
         self.log_info('Drawing {n} waveform, startint at event: {s}'.format(n=n, s=start_event))
         cut = self.Cut.all_cut if cut is None else TCut(cut)
+        print cut
         n_events = self.find_n_events(n, cut, start_event)
         self.tree.SetEstimate(n * 1024)
         n_entries = self.tree.Draw('wf{ch}:trigger_cell'.format(ch=channel), cut, 'goff', n_events, start_event)
