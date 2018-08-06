@@ -137,7 +137,7 @@ class Converter:
             return config
         options = self.RunParser.options('ROOTFILE_GENERATION')
         for opt in options:
-            if any(opt.endswith(ending) for ending in ['_range', '_region', '_range_drs4']) or opt == 'spectrum_polarities':
+            if any(opt.endswith(ending) for ending in ['_range', '_region', '_range_drs4', '_roi']) or opt == 'spectrum_polarities':
                 config[opt] = json.loads(self.RunParser.get('ROOTFILE_GENERATION', opt))
             elif opt not in ['excluded_runs']:
                 config[opt] = self.RunParser.getint('ROOTFILE_GENERATION', opt)
