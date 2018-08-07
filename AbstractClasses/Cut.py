@@ -119,9 +119,7 @@ class Cut(Elementary):
         dic['old_bucket'] = TCut('old_bucket', '')
         dic['bucket'] = TCut('bucket', '')
         #scintillator signal
-        dic['n_scint_peaks'] = TCut('scint_x_time', '') #scintillator peaks
-        #dic['scint_peaks_before'] = TCut('scint_peaks_before', '') #region cut on scintillator signal
-        #dic['scint_peaks_after'] = TCut('scint_peaks_after', '')
+        dic['n_scint_peaks'] = TCut('n_scint_peaks', '') #scintillator peaks
         # tracks
         dic['hit'] = TCut('hit', '')
         dic['masks'] = TCut('masks', '')
@@ -149,6 +147,7 @@ class Cut(Elementary):
         self.CutConfig['chi2X'] = self.ana_config_parser.getint('CUT', 'chi2X')
         self.CutConfig['chi2Y'] = self.ana_config_parser.getint('CUT', 'chi2Y')
         self.CutConfig['slope'] = self.ana_config_parser.getint('CUT', 'slope')
+        self.CutConfig['scintillator_cut'] = self.ana_config_parser.getboolean('CUT', 'scintillator_cut')
 
     def load_event_range(self, event_range=None):
         """ Gets the event range cut. If the arguments are negative, they are interpreted as time in minutes. Therefore, e.g. load_event_range(-10, 700000) means that only events are considered
@@ -289,10 +288,10 @@ class Cut(Elementary):
         self.JumpCut += self.generate_jump_cut()
 
         # -- SCINTILLATOR CUT --
-        self.CutStrings['n_scint_peaks'] += '(@peaks2_x_time.size()==1)'  # number of peaks = 1
-        #self.CutStrings['scint_peaks_after'] += '(Sum$(peaks2_x_time>50)==0)'  # peak positions before region
-        #self.CutStrings['scint_peaks_before'] += '(Sum$(peaks2_x_time<41)==0)'  # peak positions after region
-
+        if self.CutConfig['scintillator_cut']:
+            self.CutStrings['n_scint_peaks'] += 'n_peaks2_total==1'  # number of peaks = 1
+            self.CutStrings['n_scint_peaks'] += 'n_peaks2_before_roi==0'  # peak positions before region
+            self.CutStrings['n_scint_peaks'] += 'n_peaks2_after_roi==0'  # peak positions after region
 
         gROOT.SetBatch(0)
 
