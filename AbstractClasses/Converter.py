@@ -452,7 +452,7 @@ class Converter:
 
 if __name__ == '__main__':
     from Run import Run
-    zrun = Run(143, test_campaign='201707-2', tree=False, verbose=True)
+    zrun = Run(143, test_campaign='201807-2', tree=False, verbose=True)
     z = Converter(zrun)
     # run_info = z.get_run_info(run_number=393)
     # z.convert_run(run_info)

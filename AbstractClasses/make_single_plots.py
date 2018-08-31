@@ -2,10 +2,11 @@
 
 from PadAnalysis import PadAnalysis
 from Elementary import Elementary
+import numpy as np
 
-tc = '201510'
+tc = '201807'
 a = Elementary(tc)
-a.print_banner('STARTING SINGLE PLOT GENERATION')
+#a.print_banner('STARTING SINGLE PLOT GENERATION')
 a.print_testcampaign()
 
 
@@ -16,11 +17,12 @@ def set_save_dirs(ana):
     
 
 # for run in [392, 398]:
-for run in [171, 178, 392, 398]:
+for run in np.arange(127, 137, 1):
+    print run
     z = PadAnalysis(run, 0)
     set_save_dirs(z)
-    if run in [178, 398]:
-        z.draw_bucket_waveforms(show=False, start=110000)
+    #if run in [178, 398]:
+    #    z.draw_bucket_waveforms(show=False, start=110000)
     z.draw_trigger_cell_vs_peakpos(show=False, corr=False)
     z.draw_trigger_cell_vs_peakpos(show=False, corr=True)
     z.draw_trigger_cell_vs_peakpos(show=False, corr=True, t_corr=True)

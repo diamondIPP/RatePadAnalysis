@@ -93,7 +93,7 @@ class VoltageScan(Elementary):
         # gr1.SetName('data') if len(graphs) < 5 else self.do_nothing()
 
         mg = TMultiGraph('mg_ph', '' + self.DiamondName)
-        # mg.Add(gr_line, 'l')
+        #mg.Add(gr_line, 'l')
         for gr in graphs:
             if gr.GetName().startswith('gFull'):
                 legend.AddEntry(gr, gr.GetTitle(), 'l')

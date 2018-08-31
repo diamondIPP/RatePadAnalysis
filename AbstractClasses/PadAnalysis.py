@@ -268,7 +268,7 @@ class PadAnalysis(Analysis):
     # ==========================================================================
     # region 2D SIGNAL DISTRIBUTION
 
-    def draw_efficiency_map(self, res=1.5, cut='all', show=True):
+    def draw_efficiency_map(self, res=1.5, cut='all', z_range=[0,1000], show=True):
         cut_string = TCut(cut) + self.Cut.CutStrings['tracks']
         cut_string = self.Cut.generate_special_cut(excluded=['fiducial']) if cut == 'all' else cut_string
         p = TProfile2D('p_em', 'Efficiency Map {d}'.format(d=self.DiamondName), *self.Plots.get_global_bins(res))
@@ -277,7 +277,7 @@ class PadAnalysis(Analysis):
         self.format_histo(p, x_tit='Track x [cm]', y_tit='Track y [cm]', z_tit='Efficiency [%]', y_off=1.4, z_off=1.5, ncont=100)
         self.save_histo(p, 'Efficiency Map', show, lm=.13, rm=.17, draw_opt='colz')
 
-    def draw_signal_map(self, res=1.5, cut=None, fid=False, hitmap=False, redo=False, show=True, prnt=True):
+    def draw_signal_map(self, res=1.5, cut=None, fid=False, hitmap=False, redo=False, show=True, prnt=True, z_range=[0,40000]):
         cut = self.Cut.generate_special_cut(excluded=['fiducial'], prnt=prnt) if not fid and cut is None else cut
         cut = self.Cut.all_cut if cut is None else TCut(cut)
         suf = '{c}_{ch}'.format(c=cut.GetName(), ch=self.Cut.CutConfig['chi2X'])
@@ -290,12 +290,17 @@ class PadAnalysis(Analysis):
             self.log_info('drawing {mode}map of {dia} for Run {run}...'.format(dia=self.DiamondName, run=self.RunNumber, mode='hit' if hitmap else 'signal '))
             sig = self.generate_signal_name()
             x_var, y_var = (self.Cut.get_track_var(self.DiamondNumber - 1, v) for v in ['x', 'y'])
-            self.tree.Draw('{z}{y}:{x}>>{h}'.format(z=sig + ':' if not hitmap else '', x=x_var, y=y_var, h=name), cut, 'goff')
+            # to go to electrons:
+            # CIVIDEC Cx: 459 eh/ADC for diamond (1021 for SiD6, SiD7)
+            # CIVIDEC C6: 1267 eh/ADC for diamond (2815 for SiD6, SiD7)
+            self.tree.Draw('459*{z}{y}:{x}>>{h}'.format(z=sig + ':' if not hitmap else '', x=x_var, y=y_var, h=name), cut, 'goff')
             self.set_dia_margins(h1)
             self.set_ph_range(h1)
             z_tit = 'Number of Entries' if hitmap else 'Pulse Height [au]'
             self.format_histo(h1, x_tit='track_x [cm]', y_tit='track_y [cm]', y_off=1.4, z_off=1.3, z_tit=z_tit, ncont=50, ndivy=510, ndivx=510)
             self.SignalMapHisto = h1
+            z_axis = h1.GetZaxis()
+            z_axis.SetRangeUser(z_range[0], z_range[1])
             return h1
 
         set_statbox(only_entries=True, x=0.82)
@@ -1784,12 +1789,14 @@ class PadAnalysis(Analysis):
             #get waveforms
             wf2 = [-1.0*e for e in self.tree.wf2]
             times = self.run.get_calibrated_times(self.tree.trigger_cell)
-            ax.plot(times, wf2, 'k', lw=0.2)
+
 
             #tmp_t = [int(e) for e in self.tree.peaks2_x]
             #peaks_t = [times[e] for e in tmp_t]
             peaks_t = [e for e in self.tree.peaks2_x_time]
             peaks_y = [e for e in self.tree.peaks2_y]
+            #if len(peaks_t) ==1 and peaks_t[0] > 40 and peaks_t[0]<50:
+            ax.plot(times, wf2, 'k', lw=0.2)
             ax.plot(peaks_t, peaks_y, 'r+')
         fig.show()
 
