@@ -162,6 +162,11 @@ class AnalysisCollection(Elementary):
         self.set_verbose(old_verbose)
         print
         self.print_all_off_results()
+
+    def generate_signal_maps(self, zrange=[0,20]):
+        for runnr, run in self.collection.iteritems():
+            run.draw_signal_map(redo=1, z_range=zrange)
+
     
     def scale_current_gr(self, gr):
         vals = [gr.GetY()[i] for i in xrange(gr.GetN())]
