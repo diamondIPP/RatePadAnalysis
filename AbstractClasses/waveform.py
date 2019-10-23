@@ -61,10 +61,10 @@ class Waveform(Elementary):
             c.cd(i + 1)
             wf.Draw('aclp')
 
-    def draw_average(self, n=100, cut=None, align_peaks=True, show=True, show_noise=False):
+    def draw_average(self, n=100, cut=None, align_peaks=True, show=True, show_noise=False, t_corr=True, channel=None, start_event=None):
         p = TProfile('pawf', 'Averaged Waveform', 2000, 0, 500)
         cut = self.Cut.all_cut if cut is None else TCut(cut)
-        values, times = self.get_values(n, cut)
+        values, times = self.get_values(n, cut, start_event, t_corr, channel)
         if align_peaks:
             self.Tree.Draw(self.Ana.PeakName, cut, 'goff')
             peak_times = [self.Tree.GetV1()[i] for i in xrange(n)]

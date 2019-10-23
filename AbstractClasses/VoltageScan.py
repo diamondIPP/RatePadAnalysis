@@ -8,6 +8,7 @@ from Elementary import Elementary
 from ROOT import gStyle
 from InfoLegend import InfoLegend
 from Utils import make_ufloat
+import pickle
 
 
 class VoltageScan(Elementary):
@@ -55,7 +56,6 @@ class VoltageScan(Elementary):
         return self.draw_pulse_height(binning, pulser=True, redo=redo, show=show)
 
     def draw_pulse_height(self, binning=None, pulser=False, redo=False, show=True):
-
         marker_size = 1
         gStyle.SetEndErrorSize(4)
         ph = self.Ana.Pulser.get_pulse_heights(redo=redo) if pulser else self.Ana.get_pulse_heights(binning, redo)
@@ -70,4 +70,12 @@ class VoltageScan(Elementary):
         self.draw_histo(g, draw_opt='apl', lm=.14, show=show)
         self.draw_preliminary()
         self.save_plots('{s}VoltageScan'.format(s='Signal' if not pulser else 'Pulser'))
+
+        #dump pickle with values
+        y = [float(e.n) for e in y_values]
+        y_err = [float(e.s) for e in y_values]
+        x = [float(e.n) for e in x]
+        with open('/home/dorfer/psi_plots/sid6_C6_1_201708-2.pkl', 'wb') as f:
+            pickle.dump([x, y, y_err], f)
+
         return g

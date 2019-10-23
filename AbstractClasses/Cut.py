@@ -126,7 +126,9 @@ class Cut(Elementary):
         dic['slope_y'] = TCut('slope_y', '')
         dic['rhit'] = TCut('rhit', '')
         dic['fiducial'] = TCut('fiducial', '')
+        dic['split_events'] = TCut('SplitEvents', '')
         dic['AllCuts'] = TCut('AllCuts', '')
+
         return dic
 
     # ==============================================
@@ -271,6 +273,8 @@ class Cut(Elementary):
         self.CutStrings['slope_x'] += self.generate_slope('x')
         self.CutStrings['slope_y'] += self.generate_slope('y')
         self.CutStrings['tracks'] += 'n_tracks==1'
+        #self.CutStrings['split_events'] += 'Entry$>140000&&Entry$<205000'
+        #self.CutStrings['split_events'] += 'Entry$>400000'
 
         # -- EVENT RANGE CUT --
         self.CutStrings['event_range'] += self.generate_event_range()
