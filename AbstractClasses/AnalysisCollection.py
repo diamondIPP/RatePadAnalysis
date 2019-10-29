@@ -401,6 +401,7 @@ class AnalysisCollection(Elementary):
 		plt.plot(xval, yval)
 		plt.plot(xval, ffunc, 'r')
 		plt.show()
+		print('Mean PH:',np.mean(yval), np.std(yval))
 
 
 
@@ -1228,13 +1229,31 @@ class AnalysisCollection(Elementary):
 		self.RootObjects.append([gr, c])
 
 	# endregion
+	def draw_accumulated_signal_map(self, hitmap=False, redo=False):
+		f = PadAnalysis.draw_dia_hitmap if hitmap else PadAnalysis.draw_signal_map
+		histos = self.make_plots('{} maps'.format('hit' if hitmap else 'signal'), f, {'show': False, 'prnt': False, 'redo': redo})
+		hist_base = histos[0]
+		print hist_base
+
+		glob_max = 20000
+		glob_min = 1000
+		for i, h in enumerate(histos[1:-1]):
+			hist_base.Add(histos[i],1)
+		self.format_histo(hist_base, z_range=[glob_min, glob_max], x_range=[-2.8,3.4], y_range=[-3.8,2.2], lab_size=0.045, tit_size=0.045, z_off=1.8, y_off=1.00, x_off=1.1, stats=False) if not hitmap else do_nothing()
+		self.save_histo(hist_base, 'Combined Signal Map', show=True, draw_opt='colz', rm=.16, lm=.12, prnt=False)
+
+
+#		self.format_histo(mg1, lab_size=0.045, tit_size=0.045, x_off=1.35, y_off=2)
+#		self.save_histo(mg1, 'PulseHeightZero{mod}'.format(mod=mode), not save_comb, self.save_dir, lm=.18, draw_opt='Al', logx=not vs_time, bm=0.18, l=leg)
+
+
 	def draw_signal_maps(self, hitmap=False, redo=False):
 		f = PadAnalysis.draw_dia_hitmap if hitmap else PadAnalysis.draw_signal_map
 		histos = self.make_plots('{} maps'.format('hit' if hitmap else 'signal'), f, {'show': False, 'prnt': False, 'redo': redo})
 		#glob_max = (int(max([h.GetMaximum() for h in histos])) + 5) / 5 * 5
 		#glob_min = int(min([h.GetMinimum() for h in histos])) / 5 * 5
 
-		glob_max = 10
+		glob_max = 20000
 		glob_min = 0
 		for i, h in enumerate(histos):
 			self.format_histo(h, z_range=[glob_min, glob_max]) if not hitmap else do_nothing()

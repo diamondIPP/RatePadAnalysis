@@ -349,7 +349,7 @@ class PadAnalysis(Analysis):
 			self.log_info('drawing {mode}map of {dia} for Run {run}...'.format(dia=self.DiamondName, run=self.RunNumber, mode='hit' if hitmap else 'signal '), prnt=prnt)
 			sig = self.generate_signal_name()
 			x_var, y_var = (self.Cut.get_track_var(self.DiamondNumber - 1, v) for v in ['x', 'y'])
-			self.tree.Draw('{z}{y}*10:{x}*10>>{h}'.format(z=sig + ':' if not hitmap else '', x=x_var, y=y_var, h=name), cut, 'goff')
+			self.tree.Draw('1306*({z}):{y}*10:{x}*10>>{h}'.format(z=sig + '' if not hitmap else '', x=x_var, y=y_var, h=name), cut, 'goff')
 			return h1
 
 		self.set_statbox(entries=True, x=0.82)
@@ -357,9 +357,9 @@ class PadAnalysis(Analysis):
 		h = do_pickle(pickle_path, func, redo=redo)
 		self.set_dia_margins(h)
 		self.set_z_range(h)
-		z_tit = 'Number of Entries' if hitmap else 'Pulse Height [mV]'
-		self.format_histo(h, x_tit='Track Position X [mm]', y_tit='Track Position Y [mm]', y_off=1.4, z_off=1.5, z_tit=z_tit, ncont=50, ndivy=510, ndivx=510, z_range=z_range)
-		self.draw_histo(h, '', show, lm=.12, rm=.16, draw_opt='colzsame')
+		z_tit = 'Number of Entries' if hitmap else 'Pulse Height [#eh-pairs]'
+		self.format_histo(h, x_tit='Track Position X [mm]', y_tit='Track Position Y [mm]', y_off=1.4, z_off=1.5, z_tit=z_tit, ncont=50, ndivy=510, ndivx=510, stats=False, z_range=z_range)
+		self.draw_histo(h, '', show, lm=.12, rm=.20, draw_opt='colzsame')
 		self.draw_fiducial_cut(scale=10)
 		# self.draw_detector_size(scale=10)
 		self.save_plots('HitMap' if hitmap else 'SignalMap2D', prnt=prnt, save=save)
@@ -1408,6 +1408,7 @@ class PadAnalysis(Analysis):
 		for i, name in enumerate(self.IntegralNames):
 			if name.startswith('ch{}'.format(self.channel)):
 				print str(i).zfill(3), name
+		print z.Run.PeakIntegrals
 
 	# endregion
 
