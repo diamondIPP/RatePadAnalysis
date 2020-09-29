@@ -70,7 +70,7 @@ class AnalysisCollection(Analysis):
         print('\033[1A\rRuns {0}-{1} were successfully loaded!{2}\n'.format(self.Runs[0], self.Runs[-1], 20 * ' '))
 
     def remove_pickles(self):
-        files = glob(join(self.Dir, 'Configuration', 'Individual_Configs', '*', '*{}*_{}*'.format(self.TCString, self.RunPlan)))
+        files = glob(join(self.PickleDir, '*', '*{}*_{}*'.format(self.TCString, self.RunPlan)))
         self.info('Removing {} pickle files for run plan {}'.format(len(files), self.RunPlan))
         for f in files:
             remove_file(f)
@@ -401,8 +401,8 @@ class AnalysisCollection(Analysis):
         mg = self.get_pulse_height_graph(binning, vs_time, first_last=not vs_time, redo=redo, avrg=avrg, peaks=peaks)
         scale_multigraph(mg, scale, scale_to_low)
         y_range = [.95, 1.05] if y_range is None else y_range
-        format_histo(mg, y_tit='Scaled Pulse Height', y_off=1.75, x_off=1.3, draw_first=True, y_range=y_range, ndivx=503, center_y=True, **self.get_x_args(vs_time))
-        self.draw_histo(mg, '', show, lm=.14, draw_opt='a', logx=not vs_time, grid=vs_time, gridy=True, bm=.18)
+        format_histo(mg, y_tit='Scaled Pulse Height', y_off=1.75, draw_first=True, y_range=y_range, ndivx=503, center_y=True, **self.get_x_args(vs_time))
+        self.draw_histo(mg, show, lm=.14, draw_opt='a', logx=not vs_time, grid=vs_time, gridy=True, bm=.18)
         self.draw_irradiation(make_irr_string(self.RunSelection.get_irradiation()))
         self.save_plots('ScaledPulseHeights{}'.format('Time' if vs_time else 'Flux'))
         return mg.GetListOfGraphs()[0]
@@ -415,7 +415,7 @@ class AnalysisCollection(Analysis):
         # small range
         ymin, ymax = [getattr(mg.GetListOfGraphs()[0].GetYaxis(), 'GetX{}'.format(w))() for w in ['min', 'max']]
         y_range = increased_range([ymin, ymax], .5, .15) if y_range is None else y_range
-        format_histo(mg, color=None, y_tit='Signal Pulse Height [mV]', y_off=1.75, x_off=1.3, draw_first=True, y_range=y_range, **self.get_x_args(vs_time, self.Bins.FluxRange))
+        format_histo(mg, color=None, y_tit='Signal Pulse Height [mV]', y_off=1.75, draw_first=True, y_range=y_range, **self.get_x_args(vs_time, self.Bins.FluxRange))
         self.save_histo(mg, 'PulseHeight{mod}'.format(mod=self.get_mode(vs_time)), show=False, lm=.14, draw_opt='A', logx=not vs_time, grid=vs_time)
 
         # no zero suppression

@@ -10,7 +10,7 @@ import ConfigParser
 class MCRun(Run):
 
     def __init__(self, validate = True, run_number = None, verbose=False):
-        Run.__init__(self, validate=validate, run_number=run_number, verbose=verbose)
+        Run.__init__(self, validate=validate, number=run_number, verbose=verbose)
         self.MCAttributes = {
             'NPeaks': None,
             'PeakHeight': 0.5,
@@ -43,7 +43,7 @@ class MCRun(Run):
 
     def LoadMCConfig(self):
         parser = ConfigParser.ConfigParser()
-        parser.read('Configuration/MonteCarloConfig.cfg')
+        parser.read('config/MonteCarloConfig.cfg')
         SignalMode = parser.get('SIGNAL-DISTRIBUTION','SignalMode')
 
         # LOAD SIGNAL DISTRIBUTION SETTINGS

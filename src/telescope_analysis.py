@@ -23,10 +23,9 @@ class TelecopeAnalysis(Analysis):
 
         # Run
         self.Run = run_selector(run, self.TCString, tree, t_vec, verbose)
-        self.RunNumber = run
 
         # basics
-        self.TelSaveDir = str(self.RunNumber).zfill(3)
+        self.TelSaveDir = str(self.Run.Number).zfill(3)
         self.Tree = self.Run.Tree
         self.InfoLegend = InfoLegend(self)
         self.StartTime = self.Run.StartTime if self.Tree else time_stamp(self.Run.LogStart)
@@ -49,6 +48,11 @@ class TelecopeAnalysis(Analysis):
 
     def has_branch(self, branch):
         return self.Run.has_branch(branch)
+
+    def get_tree_vecs(self, strings, cut=None, dtypes=None):
+        n = self.Tree.Draw(':'.join(strings), self.Cut(cut), 'goff')
+        dtypes = [None] * len(strings) if dtypes is None else dtypes
+        return [self.Run.get_root_vec(n, i, dtype) for i, dtype in enumerate(dtypes)]
 
     # ----------------------------------------
     # region TRACKS
@@ -90,23 +94,20 @@ class TelecopeAnalysis(Analysis):
         self.draw_chi2('y', show_cut=True, show=show, x_range=x_range, prnt=prnt)
 
     def draw_angle_distribution(self, mode='x', cut=None, show_cut=False, normalise=None, show=True, prnt=True):
-        """ Displays the angle distribution of the tracks. """
-        assert mode in ['x', 'y']
-        cut = cut if cut is not None else TCut('angle_x > -900')
-        set_root_output(False)
-        h = TH1F('had', 'Track Angle Distribution in ' + mode.title(), 320, -4, 4)
-        self.Tree.Draw('{v}_{mod}>>had'.format(v='angle', mod=mode), cut, 'goff')
+        """ Shows the angle distribution of the tracks. """
+        h = TH1F('had{}'.format(mode), 'Track Angle Distribution in {}'.format(mode.title()), *self.Bins.get_angle())
+        self.Tree.Draw('angle_{m}>>had{m}'.format(m=mode), self.Cut('angle_{}>-900'.format(mode) if cut is None else cut), 'goff')
         y_tit = '{} of Entries'.format('Number' if normalise is None else 'Percentage')
-        format_histo(h, name='had{}'.format(mode), x_tit='Track Angle {} [deg]'.format(mode.title()), y_tit=y_tit, y_off=2, lw=2, normalise=normalise)
+        format_histo(h, x_tit='Track Angle {} [deg]'.format(mode.title()), y_tit=y_tit, y_off=2, normalise=normalise, fill_color=self.FillColor)
         self.format_statbox(all_stat=True, w=.3)
-        self.draw_histo(h, '', show, lm=.14, prnt=prnt, both_dias=True)
+        self.draw_histo(h, show, lm=.14, prnt=prnt, both_dias=True)
         if show_cut:
             self.draw_angle_cut(mode)
         self.save_plots('TrackAngle{mod}'.format(mod=mode.upper()), both_dias=True, prnt=prnt)
         return h
 
     def get_mean_angle(self, mode='x'):
-        picklepath = self.make_pickle_path('TrackAngle', 'mean_{}'.format(mode), self.RunNumber)
+        picklepath = self.make_pickle_path('TrackAngle', 'mean_{}'.format(mode), self.Run.Number)
 
         def f():
             h = self.draw_angle_distribution(mode=mode, show=False, prnt=False)
@@ -114,11 +115,11 @@ class TelecopeAnalysis(Analysis):
         return do_pickle(picklepath, f)
 
     def draw_angle_cut(self, mode):
-        xmin, xmax = self.Cut.calc_angle(mode=mode)[mode]
+        xmin, xmax = -self.Cut.CutConfig['track angle'], self.Cut.CutConfig['track angle']
         line = self.draw_vertical_line(xmin, -100, 1e6, style=7, w=2, color=2, name='l1{}'.format(mode))
         self.draw_vertical_line(xmax, -100, 1e6, style=7, w=2, color=2, name='l2{}'.format(mode))
         legend = self.make_legend(.65, y2=.73, nentries=1, margin=.35, name='la', scale=1.3)
-        legend.AddEntry(line, 'cut ({} deg)'.format(self.Cut.CutConfig['slope']), 'l')
+        legend.AddEntry(line, 'cut ({} deg)'.format(xmax), 'l')
         legend.Draw()
 
     def draw_both_angles(self, show=True, prnt=True):
@@ -126,7 +127,7 @@ class TelecopeAnalysis(Analysis):
         leg = self.make_legend(nentries=2, w=.25)
         stack = THStack('has', 'Track Angles')
         for h in histos:
-            format_histo(h, stats=False, color=self.get_color())
+            format_histo(h, stats=False, color=self.get_color(2))
             leg.AddEntry(h, 'Angle in {}'.format(h.GetTitle()[-1]), 'l')
             stack.Add(h)
         self.save_tel_histo(stack, 'TrackAngles', sub_dir=self.TelSaveDir, lm=.14, leg=leg, draw_opt='nostack', show=show, prnt=prnt)
@@ -138,7 +139,7 @@ class TelecopeAnalysis(Analysis):
         h = TH1F('htr', '{m} Residuals for Plane {n}'.format(n=roc, m=mode.title()), 1000, -1000, 1000)
         self.Tree.Draw('residuals{m}[{r}]*1e4>>htr'.format(m='_{m}'.format(m=mode) if mode else '', r=roc), cut, 'goff')
         format_histo(h, name='Fit Result', y_off=2.0, y_tit='Number of Entries', x_tit='Distance [#mum]', fill_color=self.FillColor, x_range=x_range)
-        self.draw_histo(h, '', show, lm=.16)
+        self.draw_histo(h, show, .16)
         if fit:
             fit = TF1('f', 'gaus(0) + gaus(3)', -.4, .4)
             sigma = get_fwhm(h) / (2 * sqrt(2 * log(2)))
@@ -157,7 +158,7 @@ class TelecopeAnalysis(Analysis):
 
     def get_residual(self, roc, chi2, mode='x', redo=False):
 
-        pickle_path = self.make_pickle_path('Tracks', 'Res{}'.format(mode.title()), self.RunNumber, roc, chi2)
+        pickle_path = self.make_pickle_path('Tracks', 'Res{}'.format(mode.title()), self.Run.Number, roc, chi2)
 
         def f():
             self.Cut.set_chi2(chi2)
@@ -183,13 +184,12 @@ class TelecopeAnalysis(Analysis):
         leg = self.make_legend(y2=.41, nentries=4)
         for roc, mode in zip([1, 1, 2, 2], ['x', 'y', 'x', 'y']):
             g = self.draw_tracking_resolution(roc, mode, show=False)
-            format_histo(g, color=self.get_color())
+            format_histo(g, color=self.get_color(4))
             mg.Add(g, 'pl')
             leg.AddEntry(g, 'ROC {} in {}'.format(roc, mode.title()), 'pl')
         y_range = [0, max(g.GetY()[i] for g in mg.GetListOfGraphs() for i in xrange(g.GetN())) * 1.1]
         format_histo(mg, x_tit='#chi^{2} [quantile]', y_tit='Residual Standard Deviation [#mum]', y_off=1.5, y_range=y_range, draw_first=True)
         self.save_histo(mg, 'EventOffsets', show, draw_opt='ap', leg=leg, lm=.13)
-        self.reset_colors()
 
     def _draw_cluster_size(self, roc, name=None, cut='', show=True):
         h = TH1I('h_cs', 'Cluster Size {d}'.format(d='ROC {n}'.format(n=roc) if name is None else name), 10, 0, 10)
@@ -343,7 +343,7 @@ class TelecopeAnalysis(Analysis):
     def draw_beam_profile(self, at_dut=1, mode='x', fit=True, fit_range=.8, res=.7, show=True, prnt=True):
         h = self.draw_tracking_map(at_dut, res, show=False, prnt=prnt)
         p = h.ProjectionX() if mode.lower() == 'x' else h.ProjectionY()
-        format_histo(p, title='Profile {}'.format(mode.title()), name='pbp{}'.format(self.RunNumber), y_off=1.3, y_tit='Number of Hits', fill_color=self.FillColor)
+        format_histo(p, title='Profile {}'.format(mode.title()), name='pbp{}'.format(self.Run.Number), y_off=1.3, y_tit='Number of Hits', fill_color=self.FillColor)
         self.format_statbox(all_stat=True)
         self.draw_histo(p, lm=.13, show=show)
         if fit:
@@ -477,7 +477,7 @@ class TelecopeAnalysis(Analysis):
 
     def _get_flux(self, show=False, prnt=True):
 
-        pickle_path = self.make_pickle_path('Flux', run=self.RunNumber)
+        pickle_path = self.make_pickle_path('Flux', run=self.Run.Number)
 
         def f():
             self.format_statbox(fit=True, entries=6)

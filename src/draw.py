@@ -6,22 +6,20 @@
 
 from __future__ import print_function
 from utils import *
-from ROOT import TGraphErrors, TGaxis, TLatex, TGraphAsymmErrors, TCanvas, gStyle, TLegend, TArrow, TPad, TCutG, TLine, kGreen, kOrange, kViolet, kYellow, kRed, kBlue, kMagenta, kAzure, \
-    kCyan, kTeal, TPaveText, TPaveStats, TH1F, TSpectrum, TEllipse
+from ROOT import TGraphErrors, TGaxis, TLatex, TGraphAsymmErrors, TCanvas, gStyle, TLegend, TArrow, TPad, TCutG, TLine, TPaveText, TPaveStats, TH1F, TSpectrum, TEllipse, TColor, TProfile
 from numpy import ndarray, zeros, sign, linspace, ones
 from os.path import expanduser, join, basename
 
-# global resolution
-g_resolution = None
-
-# TODO move related utils methods here
-
 
 class Draw:
+
+    Count = 0
+    Res = None
+
     def __init__(self, tc_string='', verbose=True, config=None):
 
         # Basics
-        self.Res = load_resolution()
+        self.load_resolution(default=800)
         self.Verbose = verbose
         self.Dir = get_base_dir()
         self.TCString = tc_string
@@ -31,8 +29,8 @@ class Draw:
         self.ServerDir = self.load_server_dir()
 
         # Colors
-        self.Count = 0
-        self.Colors = create_colorlist()
+        self.Color = 0
+        self.Colors = self.get_colors(10)
         self.FillColor = 821
 
         # Settings
@@ -45,7 +43,12 @@ class Draw:
         self.Objects = []
 
     def init_main_config(self, config):
-        return load_parser(join(self.Dir, 'Configuration', 'main.ini')) if config is None else config
+        return load_parser(join(self.Dir, 'config', 'main.ini')) if config is None else config
+
+    @staticmethod
+    def load_resolution(default=800):
+        if Draw.Res is None:
+            Draw.Res = load_resolution(default)
 
     # ----------------------------------------
     # region BASIC
@@ -58,17 +61,14 @@ class Draw:
     def get_results_dir(self):
         return join(self.Dir, 'Results', self.TCString)
 
-    def get_color(self):
-        self.Count %= 20
-        color = self.Colors[self.Count]
-        self.Count += 1
+    def get_color(self, n, i=None):
+        color = get_color_gradient(n)[choose(i, self.Color)]
+        self.Color = self.Color + 1 if self.Color < n - 1 else 0
         return color
 
-    def get_colors(self, n):
-        return array([self.get_color() for _ in range(n)], 'i')
-
-    def reset_colors(self):
-        self.Count = 0
+    @staticmethod
+    def get_colors(n):
+        return get_color_gradient(n)
 
     def get_config(self, section, option):
         return True if self.MainConfig is None else self.MainConfig.getboolean(section, option)
@@ -262,15 +262,15 @@ class Draw:
         x1, x2 = (c.GetLeftMargin(), .5) if left else (.5, 1 - c.GetRightMargin())
         return self.draw_tpavetext('Irradiation: {}'.format(irr), x1, x2, 1 - height - c.GetTopMargin(), 1 - c.GetTopMargin(), font=42, align=12, margin=0.04)
 
-    def draw_histo(self, histo, save_name='', show=True, sub_dir=None, lm=None, rm=None, bm=None, tm=None, draw_opt=None, x=None, y=None, all_pads=True,
+    def draw_histo(self, histo, show=True, lm=None, rm=None, bm=None, tm=None, draw_opt=None, x=None, y=None, all_pads=True,
                    leg=None, logy=False, logx=False, logz=False, canvas=None, grid=False, gridy=False, gridx=False, both_dias=False, prnt=True, phi=None, theta=None, ind=None):
-        return self.save_histo(histo, save_name, show, sub_dir, lm, rm, bm, tm, draw_opt, x, y, all_pads, leg, logy, logx, logz, canvas, grid, gridx, gridy, False, both_dias, ind,
+        return self.save_histo(histo, '', show, '', lm, rm, bm, tm, draw_opt, x, y, all_pads, leg, logy, logx, logz, canvas, grid, gridx, gridy, False, both_dias, ind,
                                prnt, phi, theta)
 
     def save_combined_pulse_heights(self, mg, mg1, mg_y, show=True, name=None, pulser_leg=None,
                                     x_range=None, y_range=None, rel_y_range=None, draw_objects=None, prnt=True):
         set_root_output(show)
-        c = TCanvas('c', 'c', int(self.Res * 10 / 11.), self.Res)
+        c = TCanvas('c', 'c', int(Draw.Res * 10 / 11.), Draw.Res)
         make_transparent(c)
         bm = .11
         scale = 1.5
@@ -324,19 +324,36 @@ class Draw:
         self.add(c, *draw_objects)
         set_root_output(True)
 
+    @staticmethod
+    def make_bins(values, thresh=.02):
+        bins = linspace(*(find_range(values, thresh=thresh) + [int(sqrt(values.size))]))
+        return [bins.size - 1, bins]
+
+    @staticmethod
+    def get_count():
+        Draw.Count += 1
+        return Draw.Count
+
     def draw_disto(self, values, title='', bins=None, thresh=.02, lm=None, rm=None, show=True, **kwargs):
         values = array(values, dtype='d')
-        if bins is None:
-            b = linspace(*(find_range(values, thresh=thresh) + [int(sqrt(values.size))]))
-            bins = [b.size - 1, b]
         kwargs['fill_color'] = self.FillColor if 'fill_color' not in kwargs else kwargs['fill_color']
         kwargs['y_off'] = 1.4 if 'y_off' not in kwargs else kwargs['y_off']
         kwargs['y_tit'] = 'Number of Entries' if 'y_tit' not in kwargs else kwargs['y_tit']
-        h = TH1F('h{}'.format(title.lower()[:3]), title, *bins)
-        h.FillN(values.size, values, ones(values.size))
+        h = TH1F('h{}'.format(self.get_count()), title, *choose(bins, self.make_bins, values=values, thresh=thresh))
+        fill_hist(h, values)
         format_histo(h, **kwargs)
-        self.draw_histo(h, lm=lm, rm=rm, show=show)
+        self.draw_histo(h, show, lm, rm)
         return h
+
+    def draw_profile(self, x, y, bins=None, title='', thresh=.02, lm=None, rm=None, show=True, **kwargs):
+        x, y = array(x, dtype='d'), array(y, dtype='d')
+        kwargs['fill_color'] = self.FillColor if 'fill_color' not in kwargs else kwargs['fill_color']
+        kwargs['y_off'] = 1.4 if 'y_off' not in kwargs else kwargs['y_off']
+        p = TProfile('p{}'.format(self.get_count()), title, *choose(bins, self.make_bins, values=x, thresh=thresh))
+        fill_hist(p, x, y)
+        format_histo(p, **kwargs)
+        self.draw_histo(p, show, lm, rm)
+        return p
 
     # endregion DRAW
     # ----------------------------------------
@@ -438,8 +455,8 @@ class Draw:
     def save_histo(self, histo, save_name='test', show=True, sub_dir=None, lm=None, rm=None, bm=None, tm=None, draw_opt=None, x=None, y=None, all_pads=True,
                    leg=None, logy=False, logx=False, logz=False, canvas=None, grid=False, gridx=False, gridy=False, save=True, both_dias=False, ind=None, prnt=True, phi=None, theta=None, sumw2=False):
         fac = 1 if self.Title else 1.16
-        x = int(self.Res * fac) if x is None else int(x * self.Res)
-        y = self.Res if y is None else int(y * self.Res)
+        x = int(Draw.Res * fac) if x is None else int(x * Draw.Res)
+        y = Draw.Res if y is None else int(y * Draw.Res)
         h = histo
         h.Sumw2(sumw2) if hasattr(h, 'Sumw2') and sumw2 is not None else do_nothing()
         set_root_output(show)
@@ -511,7 +528,7 @@ class Draw:
 
     def make_canvas(self, name='c', title='c', x=1., y=1., logx=None, logy=None, logz=None, gridx=None, gridy=None, transp=None, divide=None, show=True):
         set_root_output(show)
-        c = TCanvas(name, title, int(x * self.Res), int(y * self.Res))
+        c = TCanvas(name, title, int(x * Draw.Res), int(y * Draw.Res))
         do([c.SetLogx, c.SetLogy, c.SetLogz], [logx, logy, logz])
         do([c.SetGridx, c.SetGridy], [gridx, gridy])
         do(make_transparent, c, transp)
@@ -530,11 +547,9 @@ class Draw:
 
     def format_statbox(self, x=.95, y=None, w=.2, h=.15, only_fit=False, fit=False, entries=False, form=None, m=False, rms=False, all_stat=False):
         gStyle.SetOptFit(int(only_fit or fit))
-        opt_stat = '100000{}{}{}0'.format(*[1 if val else 0 for val in [rms, m, entries]] if not all_stat else [1, 1, 1])
+        opt_stat = '100000{}{}{}0'.format(*[int(v) for v in [rms, m, entries]] if not all_stat else [1, 1, 1])
         if only_fit:
             opt_stat = '0011'
-        if fit:
-            opt_stat = '1111'
         y = (.88 if self.Title else .95) if y is None else y
         gStyle.SetOptStat(int(opt_stat))
         gStyle.SetFitFormat(form) if form is not None else do_nothing()
@@ -683,16 +698,6 @@ def fix_chi2(g, prec=.01, show=True):
     return FitRes(fit) if fit is not None else FitRes()
 
 
-def create_colorlist():
-    col_names = [kGreen, kOrange, kViolet, kYellow, kRed, kBlue, kMagenta, kAzure, kCyan, kTeal]
-    colors = []
-    for color in col_names:
-        colors.append(color + (1 if color != 632 else -7))
-    for color in col_names:
-        colors.append(color + (3 if color != 800 else 9))
-    return colors
-
-
 def make_graph_args(x, y, ex=None, ey=None):
     if len(list(x)) != len(list(y)):
         log_warning('Arrays have different size!')
@@ -707,17 +712,13 @@ def set_titles(status=True):
     gStyle.SetOptTitle(status)
 
 
-def load_resolution():
-    global g_resolution
-    g_resolution = 800
-    if g_resolution is None:
-        try:
-            from screeninfo import get_monitors
-            g_resolution = round_down_to(get_monitors()[0].height, 500)
-        except Exception as err:
-            warning(err)
-            return 1000
-    return g_resolution
+def load_resolution(default=800):
+    try:
+        from screeninfo import get_monitors
+        return int(round_up_to(get_monitors()[0].height / 2, 100))
+    except Exception as err:
+        warning(err)
+        return default
 
 
 def get_graph_vecs(g):
@@ -742,6 +743,10 @@ def get_hist_args(p, err=True):
 
 def get_hist_vecs(p, err=True):
     return get_hist_args(p, err), get_hist_vec(p, err)
+
+
+def get_bin_entries(h):
+    return array([h.GetBinEntries(ibin) for ibin in range(1, h.GetNbinsX() + 1)])
 
 
 def get_h_values(h):
@@ -846,6 +851,16 @@ def update_canvas(c=None):
     c = choose(c, get_last_canvas())
     c.Modified()
     c.Update()
+
+
+def get_color_gradient(n):
+    stops = array([0., .5, 1], 'd')
+    green = array([0. / 255., 200. / 255., 80. / 255.], 'd')
+    blue = array([0. / 255., 0. / 255., 0. / 255.], 'd')
+    red = array([180. / 255., 200. / 255., 0. / 255.], 'd')
+    color_gradient = TColor.CreateGradientColorTable(len(stops), stops, red, green, blue, 255)
+    color_table = [color_gradient + ij for ij in xrange(255)]
+    return color_table[0::(len(color_table) + 1) / n]
 
 
 if __name__ == '__main__':

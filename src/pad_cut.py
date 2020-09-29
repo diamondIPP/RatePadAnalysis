@@ -34,7 +34,7 @@ class PadCut(Cut):
     # region GET
     def get_raw_pedestal(self):
         n = self.Analysis.Tree.Draw(self.Analysis.get_signal_name(sig_type='pedestal'), self(), 'goff')
-        return make_ufloat(mean_sigma(self.Analysis.Run.get_root_vec(n)))
+        return make_ufloat(mean_sigma(self.Run.get_root_vec(n)))
 
     def get_raw_snr(self):
         ped = self.get_raw_pedestal()
@@ -61,7 +61,8 @@ class PadCut(Cut):
         # -- SIGNAL --
         self.CutStrings.register(self.generate_pedestal_sigma(), 30)
         self.CutStrings.register(self.generate_threshold(), 31)
-        self.CutStrings.register(self.generate_timing(), 35)
+        # self.CutStrings.register(self.generate_timing(), 35)
+        # self.CutStrings.register(self.generate_cft(), 36)
 
         # -- FIDUCIAL --
         self.CutStrings.register(self.generate_fiducial(), 90)
@@ -74,11 +75,11 @@ class PadCut(Cut):
 
     def generate_saturated(self):
         cut_string = '!is_saturated[{ch}]'.format(ch=self.Channel)
-        description = 'exclude {:.1f}% saturated events'.format(100. * self.find_n_saturated(invert(cut_string)) / self.Analysis.Run.NEntries)
+        description = 'exclude {:.1f}% saturated events'.format(100. * self.find_n_saturated(invert(cut_string)) / self.Run.NEntries)
         return CutString('saturated', cut_string, description)
 
     def generate_pulser(self):
-        return CutString('pulser', '!pulser', 'exclude {:.1f}% pulser events'.format(100. * self.find_n_pulser('pulser') / self.Analysis.Run.NEntries))
+        return CutString('pulser', '!pulser', 'exclude {:.1f}% pulser events'.format(100. * self.find_n_pulser('pulser') / self.Run.NEntries))
 
     def generate_pedestal_sigma(self, sigma=None):
         sigma = self.CutConfig['pedestal_sigma'] if sigma is None else sigma
@@ -106,6 +107,13 @@ class PadCut(Cut):
         description = 'bucket events with threshold < {:.1f}mV'.format(threshold)
         return CutString('bucket', string if self.generate_pre_bucket() else '', description)
 
+    def generate_cft(self, n_sigma=3):
+        fit = self.fit_cft()
+        m, s = fit.Parameter(1), fit.Parameter(2)
+        description = '{:1.1f}ns < constant fraction time < {:.1f}ns'.format(m - n_sigma * s, m + n_sigma * s)
+        var = self.Analysis.Timing.get_cft_name()
+        return CutString('cft', '{} < {v} && {v} < {}'.format(m - n_sigma * s, m + n_sigma * s, v=var), description)
+
     def generate_timing(self, n_sigma=3):
         t_correction, fit = self.calc_timing_range()
         if fit is None:
@@ -124,11 +132,11 @@ class PadCut(Cut):
     # ----------------------------------------
     # region COMPUTE
     def find_n_pulser(self, cut, redo=False):
-        pickle_path = self.Analysis.make_pickle_path('Cuts', 'NPulser', self.RunNumber)
+        pickle_path = self.Analysis.make_pickle_path('Cuts', 'NPulser', self.Run.Number)
         return int(do_pickle(pickle_path, self.Analysis.Tree.GetEntries, None, redo, str(cut)))
 
     def find_n_saturated(self, cut, redo=False):
-        pickle_path = self.Analysis.make_pickle_path('Cuts', 'NSaturated', self.RunNumber)
+        pickle_path = self.Analysis.make_pickle_path('Cuts', 'NSaturated', self.Run.Number)
         return int(do_pickle(pickle_path, self.Analysis.Tree.GetEntries, None, redo, str(cut)))
 
     def find_fid_cut(self, thresh=.93, show=True):
@@ -148,17 +156,17 @@ class PadCut(Cut):
         return [f1.GetX(thresh) / 10, f2.GetX(thresh) / 10]
 
     def calc_signal_threshold(self, use_bg=False, show=True, show_all=False):
-        run = self.HighRateRun if self.HighRateRun is not None else self.RunNumber
+        run = self.HighRateRun if self.HighRateRun is not None else self.Run.Number
         pickle_path = self.Analysis.make_pickle_path('Cuts', 'SignalThreshold', run, self.DUT.Number)
         show = False if show_all else show
 
         def f():
-            t = self.Analysis.info('Calculating signal threshold for bucket cut of run {run} and {d} ...'.format(run=self.Analysis.RunNumber, d=self.DUT.Name), next_line=False)
+            t = self.Analysis.info('Calculating signal threshold for bucket cut of run {run} and {d} ...'.format(run=self.Run.Number, d=self.DUT.Name), next_line=False)
             h = TH1F('h', 'Bucket Cut', 200, -50, 150)
             self.Analysis.Tree.Draw('{name}>>h'.format(name=self.Analysis.SignalName), self.get_bucket(), 'goff')
             format_histo(h, x_tit='Pulse Height [mV]', y_tit='Entries', y_off=1.8, stats=0, fill_color=self.Analysis.FillColor)
-            if h.GetEntries() / self.Analysis.Run.NEntries < .01:
-                log_info('Not enough bucket events ({:.1f}%)'.format(h.GetEntries() / self.Analysis.Run.NEntries))
+            if h.GetEntries() / self.Run.NEntries < .01:
+                log_info('Not enough bucket events ({:.1f}%)'.format(h.GetEntries() / self.Run.NEntries))
                 self.Analysis.add_to_info(t)
                 return -30
             snr, ped = self.get_raw_snr()
@@ -250,10 +258,10 @@ class PadCut(Cut):
         return do_pickle(pickle_path, f, redo=show or show_all)
 
     def __calc_pedestal_range(self, sigma_range):
-        picklepath = self.Analysis.make_pickle_path('Pedestal', 'Cut', self.RunNumber, self.Channel)
+        picklepath = self.Analysis.make_pickle_path('Pedestal', 'Cut', self.Run.Number, self.Channel)
 
         def func():
-            t = self.Analysis.info('generating pedestal cut for {dia} of run {run} ...'.format(run=self.Analysis.RunNumber, dia=self.Analysis.DUT.Name), next_line=False)
+            t = self.Analysis.info('generating pedestal cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), next_line=False)
             h1 = TH1F('h_pdc', 'Pedestal Distribution', 600, -150, 150)
             self.Analysis.Tree.Draw('{name}>>h_pdc'.format(name=self.Analysis.PedestalName), '', 'goff')
             fit_pars = fit_fwhm(h1, do_fwhm=True, draw=False)
@@ -267,7 +275,7 @@ class PadCut(Cut):
         return [mean_ - sigma_range * sigma, mean_ + sigma_range * sigma]
 
     def calc_threshold(self, show=True):
-        pickle_path = self.Analysis.make_pickle_path('Cuts', 'Threshold', self.Analysis.RunNumber, self.Channel)
+        pickle_path = self.Analysis.make_pickle_path('Cuts', 'Threshold', self.Run.Number, self.Channel)
 
         def func():
             self.Analysis.Tree.Draw(self.Analysis.SignalName, '', 'goff', 5000)
@@ -287,9 +295,19 @@ class PadCut(Cut):
         threshold = func() if show else None
         return do_pickle(pickle_path, func, threshold)
 
+    def fit_cft(self, show=False, redo=False):
+        def f():
+            t = self.Analysis.info('generating cft cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), next_line=False)
+            cut = self.generate_custom(exclude=['cft'], prnt=False, name='cft_cut')
+            h = self.Analysis.Timing.draw_cft(cut=cut, show=show)
+            fit = h.Fit('gaus', 'qs')
+            self.Analysis.add_to_info(t)
+            return FitRes(fit)
+        return do_pickle(self.Analysis.make_simple_pickle_path('CFTFit', sub_dir='Cuts'), f, redo=redo)
+
     def calc_timing_range(self, redo=False):
         def f():
-            t = self.Analysis.info('generating timing cut for {dia} of run {run} ...'.format(run=self.Analysis.RunNumber, dia=self.Analysis.DUT.Name), next_line=False)
+            t = self.Analysis.info('generating timing cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), next_line=False)
             cut = self.generate_custom(exclude=['timing'], prnt=False, name='timing_cut')
             t_correction = self.Analysis.Timing.calc_fine_correction(redo=redo)
             h = self.Analysis.Timing.draw_peaks(show=False, cut=cut, fine_corr=t_correction != '0', prnt=False, redo=redo)

@@ -3,9 +3,6 @@ from ConfigParser import ConfigParser
 from glob import glob
 from numpy import deg2rad, rad2deg, arange, round_
 
-# global test campaign
-g_test_campaign = None
-
 
 class Analysis(Draw):
     """ This class provides default behaviour objects in the analysis framework and is the parent of all analyses.
@@ -17,7 +14,7 @@ class Analysis(Draw):
 
         # Configuration
         self.Verbose = verbose
-        self.ConfigDir = join(get_base_dir(), 'Configuration')
+        self.ConfigDir = join(get_base_dir(), 'config')
         self.MainConfig = self.load_main_config()
         self.Momentum = self.MainConfig.getfloat('BEAM', 'momentum')
         self.PathLength = self.MainConfig.getfloat('BEAM', 'path length')
@@ -32,7 +29,7 @@ class Analysis(Draw):
 
         # Test Campaign
         self.TCString = self.load_test_campaign(testcampaign)
-        self.TestCampaign = datetime.strptime(self.TCString.split('-')[0], '%Y%M')
+        self.TestCampaign = datetime.strptime(self.TCString.split('-')[0], '%Y%m')
 
         # Analysis Config
         self.Config = self.load_config()
@@ -46,7 +43,7 @@ class Analysis(Draw):
     @staticmethod
     def load_main_config():
         parser = ConfigParser()
-        file_name = join(get_base_dir(), 'Configuration', 'main.ini')
+        file_name = join(get_base_dir(), 'config', 'main.ini')
         if not file_exists(file_name):
             log_critical('{} does not exist. Please copy it from the main.default and adapt it to your purpose!'.format(file_name))
         parser.read(file_name)
@@ -56,19 +53,15 @@ class Analysis(Draw):
         parser = ConfigParser()
         file_name = join(self.ConfigDir, self.TCString, 'AnalysisConfig.ini')
         if not file_exists(file_name):
-            log_critical('AnalysisConfig.ini does not exist for {0}! Please create it in Configuration/{0}!'.format(self.TestCampaign))
+            log_critical('AnalysisConfig.ini does not exist for {0}! Please create it in config/{0}!'.format(self.TestCampaign))
         parser.read(file_name)
         return parser
 
     def load_test_campaign(self, testcampaign):
-        global g_test_campaign
-        if g_test_campaign is None and testcampaign is None:
-            g_test_campaign = self.MainConfig.get('MAIN', 'default test campaign')
-        elif testcampaign is not None:
-            g_test_campaign = testcampaign
-        if g_test_campaign not in self.get_test_campaigns():
-            critical('The Testcampaign {} does not exist!'.format(g_test_campaign))
-        return g_test_campaign
+        tc = testcampaign if testcampaign is not None else self.MainConfig.get('MAIN', 'default test campaign')
+        if tc not in self.get_test_campaigns():
+            critical('The Testcampaign {} does not exist!'.format(tc))
+        return tc
 
     def print_testcampaign(self, pr=True):
         data = self.TCString.split('-')
@@ -121,7 +114,8 @@ class Analysis(Draw):
         ensure_dir(directory)
         campaign = self.TCString if camp is None else camp
         run_str = str(run) if run is not None else self.RunPlan if hasattr(self, 'RunPlan') else ''
-        run_str = run_str if run is not None or run_str else str(self.RunNumber) if hasattr(self, 'RunNumber') else ''
+        # noinspection PyUnresolvedReferences
+        run_str = run_str if run is not None or run_str else str(self.Run.Number) if hasattr(self.Run, 'Number') else ''
         # noinspection PyUnresolvedReferences
         dut = str(dut if dut is not None else self.DUT.Number if hasattr(self, 'DUT') and hasattr(self.DUT, 'Number') else '')
         return join(directory, '{}.pickle'.format('_'.join([v for v in [name, campaign, run_str, dut, str(suf)] if v])))

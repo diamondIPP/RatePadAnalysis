@@ -32,7 +32,7 @@ class DiaScans(Analysis):
         self.Selection = self.load_selection(selection_name)
 
         # Config
-        self.DUTParser = load_parser(join(self.Dir, 'Configuration', 'DiamondAliases.ini'))
+        self.DUTParser = load_parser(join(self.Dir, 'config', 'DiamondAliases.ini'))
 
         # Info
         self.RS = RunSelection()  # dummy for information
@@ -362,7 +362,7 @@ class DiaScans(Analysis):
         values = []
         for tc in self.TestCampaigns if tc is None else [tc]:
             for run, data in sorted(self.RunInfos[tc].iteritems()):
-                info_run = Run(run_number=run, test_campaign=tc, tree=False)
+                info_run = Run(number=run, test_campaign=tc, tree=False)
                 if run_thr is not None:
                     if run_thr > 0 and int(run) < run_thr:
                         continue

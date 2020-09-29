@@ -172,6 +172,10 @@ class Bins:
             self.Pulser = bins
             self.NPulser = n_pulser
         return [self.Pulser.size - 1, array(self.Pulser, 'd')]
+
+    @staticmethod
+    def get_angle(bin_size=.1, max_angle=4):
+        return make_bins(-max_angle, max_angle, bin_size)
     # endregion GENERAL
     # ----------------------------------------
 
@@ -199,6 +203,6 @@ class Bins:
     # ----------------------------------------
 
 
-def make_bins(min_val, max_val, bin_width):
+def make_bins(min_val, max_val, bin_width=1):
     bins = arange(min_val, max_val + bin_width / 100., bin_width, dtype='d')
     return [bins.size - 1, bins]

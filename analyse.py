@@ -25,6 +25,7 @@ if not pargs.collection:
     try:
         p = z.Peaks if pargs.tree else None
         w = z.Waveform if pargs.tree else None
+        t = z.Timing if pargs.tree else None
     except AttributeError:
         pass
     if pargs.draw:
