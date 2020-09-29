@@ -56,7 +56,7 @@ class Waveform(Analysis):
         else:
             h = self.make_tgrapherrors('gaw', 'Waveform', x=times, y=values)
         y_range = increased_range([min(values), max(values)], .1, .2) if y_range is None else y_range
-        format_histo(h, x_tit='Time [ns]', y_tit='Signal [mV]', y_off=.5, stats=0, tit_size=.07, lab_size=.06, markersize=.5, x_range=x_range, y_range=y_range)
+        format_histo(h, x_tit='Time [ns]', y_tit='Signal [mV]', y_off=.5, stats=0, tit_size=.07, lab_size=.06, markersize=.5, x_range=x_range, y_range=y_range, pal=55)
         draw_opt = draw_opt if draw_opt is not None else 'col' if values.size > self.Run.NSamples else 'ap'
         self.draw_histo(h, show, draw_opt=draw_opt, lm=.073, rm=.045, bm=.18, x=1.5, y=.5, grid=1, logz=True)
         return h, n
