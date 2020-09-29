@@ -352,9 +352,9 @@ class TimingAnalysis(Analysis):
         y_vals = values.values()
         max_x = h.GetX()[max(values, key=lambda val: abs(values[val]))]
         ymin, ymax = h.GetYaxis().GetXmin(), h.GetYaxis().GetXmax()
-        if region or region is None and integral is not None:
+        leg = self.make_legend(x2=0.935, y2=.4, w=.15, scale=1.5, nentries=1 + bool(region) + bool(pedestal))
+        if type(region) in [list, ndarray] or region is None and integral is not None:
             b = self.draw_box(r[0], -1000, r[1], 1000, line_color=2, style=7, fillstyle=3002, width=2)
-            leg = self.make_legend(x2=0.935, y2=.5, w=.15, scale=1.5)
             leg.AddEntry(b, 'Signal Region')
             leg.Draw()
         if max_peak and not pedestal:
@@ -372,8 +372,9 @@ class TimingAnalysis(Analysis):
             self.draw_arrow(max_x + i[1], max_x, y_pos, y_pos, col=434, width=3, opt='<', size=.02)
         if pedestal:
             x_pos, y_pos = r[0] - 10, -20
-            self.draw_vertical_line(x_pos, -1000, 1000, color=4, w=3)
-            self.draw_tlatex(r[0] - 8, ymin + .1 * (ymax - ymin), 'Pedestal', color=4, align=12)
+            li = self.draw_vertical_line(x_pos, -1000, 1000, color=4, w=3)
+            leg.AddEntry(li, 'Pedestal Time', 'l')
+            leg.Draw()
             self.draw_arrow(x_pos - i[0], x_pos, y_pos, y_pos, col=618, width=3, opt='<', size=.02)
             self.draw_arrow(x_pos + i[1], x_pos, y_pos, y_pos, col=434, width=3, opt='<', size=.02)
             if ped_int:
@@ -387,13 +388,14 @@ class TimingAnalysis(Analysis):
         self.save_histo(h, 'Integration', draw_opt='same', canvas=get_last_canvas())
 
     def draw_signal_region(self, event=None, wide=True, show=True):
-        self.draw_integration(event=event, integral=False, max_peak=False, pedestal=False, ped_int=False, show=show, wide=wide)
+        self.draw_integration(event=event, integral=False, max_peak=False, pedestal=True, ped_int=False, show=show, wide=wide)
 
     def draw_max_peaks(self, cut=None):
         self.format_statbox(entries=True)
         h = self.draw_raw_peaks(0, 512, bin_width=.5, corr=True, show=False, cut=self.TimingCut if cut is None else TCut(cut))
         format_histo(h, y_off=.5, tit_size=.07, lab_size=.06)
         self.save_histo(h, 'MaxPeakTimings', logy=True, lm=.073, rm=.045, bm=.18, x=1.5, y=.5)
+        update_canvas()
 
     def draw_fit_peak_timing(self, show=True):
         xmin, xmax = [t * self.Ana.DigitiserBinWidth for t in self.Ana.SignalRegion]
