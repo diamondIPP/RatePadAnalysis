@@ -291,12 +291,14 @@ class PadAnalysis(DUTAnalysis):
         return h
 
     def draw_pulse_height_vs_binsize(self, show=True):
-        bin_sizes = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
-        # pulse_heights = [make_ufloat(self.draw_pulse_height(bin_width=bin_size, show=False)[1], par=0) for bin_size in bin_sizes]
-        pulse_heights = [make_ufloat(self.draw_ph(bin_size=bin_size, show=False)[1], par=0) for bin_size in bin_sizes]
+        bin_sizes = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 30000, 50000]
+        pulse_heights = [make_ufloat(self.draw_pulse_height(bin_size=bin_size, show=False)[1], par=0) for bin_size in bin_sizes]
+        # pulse_heights = [make_ufloat(self.draw_ph(bin_size=bin_size, show=False)[1], par=0) for bin_size in bin_sizes]
         g = self.make_tgrapherrors('gdbs', 'Pulse Height vs Number of Events per Bin', x=bin_sizes, y=pulse_heights)
         format_histo(g, x_tit='Number of Events per Bin', y_tit='Pulse Height [mV]', y_off=1.2)
+        m = self.draw_signal_distribution(show=False, x_range=[0, 500]).GetMean()
         self.draw_histo(g, lm=.12, show=show, gridy=True, logx=True)
+        self.draw_horizontal_line(m, 0, 1e6)
 
     def draw_pulse_height(self, bin_size=None, cut=None, y_range=None, redo=False, corr=True, sig=None, rel_t=True, show=True, save=True, prnt=True):
 
