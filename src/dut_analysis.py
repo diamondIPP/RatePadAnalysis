@@ -6,11 +6,12 @@
 from Extrema import Extrema2D
 from telescope_analysis import *
 from currents import Currents
-from ROOT import TProfile2D
+from ROOT import TProfile2D, TH3F
 from numpy import linspace, exp, vectorize
 from numpy.random import rand
 from uncertainties import umath
 from dut import DUT
+from binning import make_bins
 
 
 class DUTAnalysis(TelecopeAnalysis):
@@ -173,19 +174,46 @@ class DUTAnalysis(TelecopeAnalysis):
         cut = self.Cut.get('tracks') if cut is None else self.Cut(cut)
         return self.draw_signal_map(res, cut, fid, hitmap=True, redo=redo, bins=None, z_range=z_range, size=size, show=show, save=save, prnt=prnt)
 
-    def split_signal_map(self, m=2, n=2, grid=True, redo=False, show=True):
+    def get_fid_bins(self, m, n):
         fid_cut = array(self.Cut.CutConfig['fiducial']) * 10
         if not fid_cut.size:
             log_critical('fiducial cut not defined for {}'.format(self.DUT.Name))
         x_bins = linspace(fid_cut[0], fid_cut[1], m + 1)
         y_bins = linspace(fid_cut[2], fid_cut[3], n + 1)
-        bins = [m, x_bins, n, y_bins]
-        h = self.draw_signal_map(bins=bins, show=False, fid=True, redo=redo)
-        format_histo(h, x_range=[fid_cut[0], fid_cut[1] - .01], y_range=[fid_cut[2], fid_cut[3] - .01], name='hssm', stats=0)
+        return [m, x_bins, n, y_bins]
+
+    def split_signal_map(self, m=2, n=2, grid=True, redo=False, show=True):
+        m, x_bins, n, y_bins = self.get_fid_bins(m, n)
+        h = self.draw_signal_map(bins=[m, x_bins, n, y_bins], show=False, fid=True, redo=redo)
+        format_histo(h, x_range=[x_bins[0], x_bins[-1] - .01], y_range=[y_bins[0], y_bins[-1] - .01], name='hssm', stats=0)
         self.draw_histo(h, show=show, lm=.12, rm=.16, draw_opt='colzsame')
         self.draw_grid(x_bins, y_bins, width=2) if grid else do_nothing()
         self.save_plots('SplitSigMap')
         return h, x_bins, y_bins
+
+    def compare_mpv_mean(self, m=3, n=None, x_range=None):
+        n = choose(m, n)
+        h = TH3F('hmm', 'Sub Distributions', *self.get_fid_bins(m, n) + self.Bins.get_pad_ph(5))
+        y, x = self.Cut.get_track_vars(self.DUT.Number - 1, mm=True)
+        self.Tree.Draw('{z}:{y}:{x}>>hmm'.format(z=self.get_ph_str(), x=x, y=y), self.Cut(), 'goff')
+        projections = [h.ProjectionZ('{}{}'.format(i, j), i, i, j, j) for j in range(1, n + 1) for i in range(1, m + 1)]
+        mpvs = [p.GetBinCenter(p.GetMaximumBin()) for p in projections]
+        means = [p.GetMean() for p in projections]
+        ms = self.draw_signal_distribution(show=False, x_range=[0, 500]).GetMean()
+        c = self.make_canvas('c3', divide=(m, n))
+        self.format_statbox(all_stat=1)
+        for i, p in enumerate(projections):
+            c.cd(((i + 6) % (m * n)) + 1)
+            format_histo(p, fill_color=self.FillColor)
+            p.Draw()
+            self.draw_vertical_line(ms, name=str(i))
+        bins = make_bins(0, 300, 1)
+        self.set_results_dir('')
+        self.draw_disto(mpvs, 'mpv', bins, x_range=choose(x_range, [min(min(mpvs), min(means)) - 2, max(max(mpvs), max(means)) + 3]))
+        self.draw_disto(means, 'mean', bins, x_range=choose(x_range, [min(min(mpvs), min(means)) - 2, max(max(mpvs), max(means)) + 3]))
+        info('MPV: {}'.format(mean_sigma(mpvs)))
+        info('Mean: {}'.format(mean_sigma(means)))
+        return h
 
     def draw_sig_map_disto(self, *args, **kwargs):
         return self._draw_sig_map_disto(*args, **kwargs)
