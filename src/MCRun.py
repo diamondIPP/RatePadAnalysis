@@ -181,7 +181,7 @@ class MCRun(Run):
             result = 0.1 # bkg
             norm = 1.
             sigma = 0.04
-            for i in xrange(len(par)/2):
+            for i in range(len(par)/2):
                 result += norm*TMath.Gaus(x[0], par[2*i], sigma)*TMath.Gaus(x[1], par[2*i+1], sigma)
             return result
 
@@ -277,7 +277,7 @@ class MCRun(Run):
                 parameters[0] = npeaks
                 parameters[1] = bkg
                 parameters[2] = peak_height
-                for i in xrange(npeaks):
+                for i in range(npeaks):
                     parameters[3+4*i] = gRandom.Uniform(xmin, xmax)
                     parameters[4+4*i] = gRandom.Uniform(ymin, ymax)
                     parameters[5+4*i] = gRandom.Uniform(0.02, 0.07)
@@ -308,7 +308,7 @@ class MCRun(Run):
             result = par[1]
             if par[1] == 0:
                 norm = 1
-            for i in xrange(int(par[0])):
+            for i in range(int(par[0])):
                 result += norm*TMath.Gaus(x[0], par[3+4*i], par[5+4*i])*TMath.Gaus(x[1], par[4+4*i], par[6+4*i])
             return result
 
@@ -442,13 +442,13 @@ class MCRun(Run):
             if self.verbose:
                 print "\nToydata containing {:.0f} peaks generated.".format(self.SignalParameters[0])
                 if self.MCAttributes['SignalMode'] == 'Landau':
-                    for i in xrange(int(self.SignalParameters[0])):
+                    for i in range(int(self.SignalParameters[0])):
                         x = self.SignalParameters[3+4*i]
                         y = self.SignalParameters[4+4*i]
                         print "Peak {0:.0f} at position: ({1:.3f}/{2:.3f}) with Laundau Response MPV: {3:.2f} Sigma: {4:.1f}".format(i+1, x, y, f_signal(x, y),sigma)
                 else:
                     integral50[0] = gRandom.Gaus(f_signal(track_x[0], track_y[0]), 0.6*f_signal(track_x[0], track_y[0])-33)
-                    for i in xrange(int(self.SignalParameters[0])):
+                    for i in range(int(self.SignalParameters[0])):
                         x = self.SignalParameters[3+4*i]
                         y = self.SignalParameters[4+4*i]
                         print "Peak {0:.0f} at position: ({1:.3f}/{2:.3f}) with Gaussian Response Mean: {3:.2f} Sigma: {4:.1f}".format(i+1, x, y, f_signal(x, y), 0.6*f_signal(x, y)-33)

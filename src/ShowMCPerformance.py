@@ -44,7 +44,7 @@ tmp_Minimas = np.zeros(tries)
 
 
 count = 0
-for i in xrange(LogTree.GetEntries()):
+for i in range(LogTree.GetEntries()):
     # read the ROOT TTree
     LogTree.GetEntry(i)
     TrueNPeaks = LogTree.TrueNPeaks

@@ -9,7 +9,7 @@ from os import stat, sys
 from os.path import join, dirname, realpath
 file_dir = dirname(realpath(__file__))
 sys.path.append(join(file_dir, 'src'))
-from utils import *
+from utils.utils import *
 from converter import Converter
 from run import Run
 
@@ -18,7 +18,7 @@ class AutoConvert:
 
     def __init__(self, multi, end_run=None, test_campaign=None, verbose=False):
 
-        self.Run = Run(None, test_campaign=test_campaign, tree=False, verbose=verbose)
+        self.Run = Run(None, testcampaign=test_campaign, tree=False, verbose=verbose)
         self.Converter = Converter(self.Run)
         self.RunInfos = self.load_run_infos()
 

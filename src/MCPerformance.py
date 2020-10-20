@@ -88,7 +88,7 @@ class MCPerformance(Elementary):
             fails = 0
             tot_ghosts = 0
             peaks_generated = 0
-            for repetition in xrange(self.tries):
+            for repetition in range(self.tries):
                 cycle_nr += 1
                 print "\n{0}th repetition with Signal height set to: {1}\n".format(repetition, height)
                 run_object = MCRun(validate=False,verbose=self.verbose,run_number=364)
@@ -163,7 +163,7 @@ class MCPerformance(Elementary):
         # graph2 = ROOT.TGraph()
         # graph2.SetNameTitle('graph2', 'ghosts')
         # graph2.SaveAs(path+"/GhostsGraph.root")
-        # for i in xrange(len(heights)):
+        # for i in range(len(heights)):
         #     graph1.SetPoint(i, heights[i], success_prob[i])
         #     graph2.SetPoint(i, heights[i], ghost_prob[i])
         # graph1.Draw('ALP*')

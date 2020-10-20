@@ -2,7 +2,7 @@
 from ROOT import TFile, gROOT, TGraph, TH2F, gStyle, TCanvas, TCut, TH1F
 from sys import argv, path
 path.append('src')
-from utils import *
+from utils.utils import *
 from json import load
 from run import Run
 from datetime import datetime
@@ -12,7 +12,7 @@ from progressbar import Bar, ETA, FileTransferSpeed, Percentage, ProgressBar
 from argparse import ArgumentParser
 from os import chdir, system
 from os.path import dirname, join
-from draw import Draw, format_histo
+from utils.draw import Draw, format_histo
 
 widgets = ['Progress: ', Percentage(), ' ', Bar(marker='>'), ' ', ETA(), ' ', FileTransferSpeed()]
 plotter = Draw()
@@ -21,11 +21,11 @@ plotter = Draw()
 def load_runinfo():
     run_info = {}
     try:
-        fi = open(run.RunInfoFile, 'r')
+        fi = open(run.InfoFile, 'r')
         data = load(fi)
         fi.close()
     except NoSectionError as err:
-        log_warning('{err}\nCould not load default RunInfo! --> Using default'.format(err=err))
+        warning('{err}\nCould not load default RunInfo! --> Using default'.format(err=err))
         return None
 
     if run >= 0:
@@ -66,7 +66,7 @@ def trig_edges(nwf=None):
             if abs(buf[i * 1024 + k] - buf[i * 1024 + k + 1]) > 50:
                 h.Fill(k)
     format_histo(h, x_tit='Bin Number', y_tit='Number of Entries', y_off=1.4, stats=0, fill_color=407)
-    plotter.draw_histo(h, lm=.12)
+    plotter.histo(h, lm=.12)
 
 
 def draw_waveforms(n=1000, start_event=0, cut_string='', show=True, fixed_range=None, ch=0):
@@ -75,7 +75,7 @@ def draw_waveforms(n=1000, start_event=0, cut_string='', show=True, fixed_range=
     start = start_event + count
     print 'starting at event', start
     if not wf_exists(channel):
-        log_warning('This waveform is not stored in the tree!')
+        warning('This waveform is not stored in the tree!')
         return
     cut = cut_string
     n_events = find_n_events(n, cut, start)
@@ -94,7 +94,7 @@ def draw_waveforms(n=1000, start_event=0, cut_string='', show=True, fixed_range=
     if show:
         gROOT.SetBatch(0)
     format_histo(h, title='Waveform', name='wf', x_tit='Time [ns]', y_tit='Signal [mV]', markersize=.4, y_off=.4, stats=0, tit_size=.05)
-    plotter.draw_histo(h, '', show, lm=.06, rm=.045, draw_opt='alp' if n == 1 else 'col', x=1.5, y=.5)
+    plotter.histo(h, '', show, lm=.06, rm=.045, draw_opt='alp' if n == 1 else 'col', w=1.5, h=.5)
     count += n_events
     return h, n_events
 
@@ -188,7 +188,7 @@ def draw_peak_timings(xmin=100, xmax=400, ch=0, corr=False):
     h = TH1F('h_pt', 'PeakTimings', xmax - xmin, xmin, xmax)
     t.Draw('max_peak_{p}[{c}]>>h_pt'.format(c=ch, p='position' if not corr else 'time'), '', 'goff')
     format_histo(h, x_tit='Digitiser Bin', y_tit='Number of Entries')
-    plotter.draw_histo(h)
+    plotter.histo(h)
 
 
 def draw_both_wf(ch, show=True):
@@ -200,7 +200,7 @@ def draw_both_wf(ch, show=True):
     s = [s_proj.GetBinCenter(p_proj.FindFirstBinAbove(0)), s_proj.GetBinCenter(p_proj.FindLastBinAbove(0))]
     y = [min(p + s) - 10, max(p + s) + 10]
     format_histo(pulser, y_range=y, stats=0, markersize=.4, y_off=.5, tit_size=.05)
-    plotter.draw_histo(pulser, '', show, lm=.06, rm=.045, bm=.2, draw_opt='col', x=1.5, y=.5)
+    plotter.histo(pulser, '', show, lm=.06, rm=.045, bm=.2, draw_opt='col', w=1.5, h=.5)
     signal.Draw('samecol')
     leg_ch = 1 if not ch else 2
     draw_runinfo_legend(leg_ch)
@@ -226,7 +226,7 @@ def draw_peak_values(ch=0, show=True):
     h = TH1F('h_pv', 'PH', 100, -450, -350)
     t.Draw('max_peak_position[{c}]>>h_pv'.format(c=ch), '', 'goff')
     format_histo(h, x_tit='Peak Value [mV]', y_tit='Number of Entries', y_off=1.4)
-    plotter.draw_histo(h, show=show)
+    plotter.histo(h, show=show)
     return h
 
 
@@ -241,7 +241,7 @@ def draw_pedestal(ch=0, show=True):
     h = TH1F('h_pd', 'PH', 120, -30, 30)
     t.Draw('pedestals[{c}]>>h_pd'.format(c=ch), '', 'goff')
     format_histo(h, x_tit='Peak Value [mV]', y_tit='Number of Entries', y_off=1.4)
-    plotter.draw_histo(h, show=show)
+    plotter.histo(h, show=show)
     return h
 
 
@@ -256,7 +256,7 @@ def draw_pulser_pulse_height(ch=0, show=True):
     h = TH1F('h_ph', 'PH', 2000, -500, 500)
     t.Draw('peak_values[{c}] - pedestals[{c}]>>h_ph'.format(c=ch), '', 'goff')
     format_histo(h, x_tit='Pulser Pulse Height [mV]', y_tit='Number of Entries', y_off=1.4, x_range=[h.GetMean() - 10, h.GetMean() + 20])
-    plotter.draw_histo(h, show=show)
+    plotter.histo(h, show=show)
     return h
 
 
@@ -272,7 +272,7 @@ def draw_integral(ch=0, show=True):
     h = TH1F('h_int', 'PH', 2000, -500, 500)
     t.Draw('peak_integrals[{c}] - pedestals[{c}]>>h_int'.format(c=ch), '', 'goff')
     format_histo(h, x_tit='Pulser Pulse Height [mV]', y_tit='Number of Entries', y_off=1.4, x_range=[h.GetMean() - 10, h.GetMean() + 20])
-    plotter.draw_histo(h, show=show)
+    plotter.histo(h, show=show)
     return h
 
 
@@ -349,10 +349,10 @@ if __name__ == '__main__':
             run = None
 
     try:
-        run = Run(run, test_campaign=tc, tree=False)
+        run = Run(run, testcampaign=tc, tree=False)
         runinfo = load_runinfo()
     except ValueError:
-        run = Run(2, test_campaign='201807', tree=False)
+        run = Run(2, testcampaign='201807', tree=False)
 
     channels = read_macro(rootfile)
     t = rootfile.Get('tree')

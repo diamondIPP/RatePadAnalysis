@@ -1,5 +1,5 @@
-from utils import *
-from cut import Cut, CutString, loads, invert, TCut, linspace
+from helpers.utils import *
+from src.cut import Cut, CutString, loads, invert, TCut, linspace
 
 
 class CutPix(Cut):
@@ -49,7 +49,7 @@ class CutPix(Cut):
         self.CutStrings.register(self.generate_fiducial(center=True, n_planes=4), 90)
 
     def generate_aligned(self):
-        description = '{:.1f}% of the events excluded'.format(100. * self.find_n_misaligned() / self.Analysis.Run.NEntries) if self.find_n_misaligned() else ''
+        description = '{:.1f}% of the events excluded'.format(100. * self.find_n_misaligned() / self.Analysis.Run.NEvents) if self.find_n_misaligned() else ''
         return CutString('aligned', 'aligned[{}]'.format(self.Analysis.DUT.Number) if self.find_n_misaligned() else '', description)
 
     def generate_trigger_phase(self):
@@ -94,7 +94,7 @@ class CutPix(Cut):
         pickle_path = self.Analysis.make_pickle_path('Cuts', 'RHit', run=self.Analysis.RunNumber, ch=self.DUT.Number)
 
         def func():
-            t = self.Analysis.info('generating rhit cut in for run {run}...'.format(run=self.Analysis.RunNumber), next_line=False)
+            t = self.Analysis.info('generating rhit cut in for run {run}...'.format(run=self.Analysis.RunNumber), endl=False)
             values = get_root_vec(self.Analysis.Tree, var='residuals[{}]'.format(self.DUTPlane))
             self.Analysis.add_to_info(t)
             return get_quantiles(values, linspace(0, .2, 2001))

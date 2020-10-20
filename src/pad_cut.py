@@ -2,10 +2,9 @@
 #       cut sub class to handle all the cut strings for the DUTs with digitiser
 # created in 2015 by M. Reichmann (remichae@phys.ethz.ch)
 # --------------------------------------------------------
-from utils import *
 from ROOT import TCut, TH1F, TF1, TSpectrum
-from cut import Cut, CutString, loads, invert
-from draw import format_histo, fit_bucket
+from src.cut import Cut, CutString, invert
+from helpers.draw import *
 
 
 class PadCut(Cut):
@@ -75,11 +74,11 @@ class PadCut(Cut):
 
     def generate_saturated(self):
         cut_string = '!is_saturated[{ch}]'.format(ch=self.Channel)
-        description = 'exclude {:.1f}% saturated events'.format(100. * self.find_n_saturated(invert(cut_string)) / self.Run.NEntries)
+        description = 'exclude {:.1f}% saturated events'.format(100. * self.find_n_saturated(invert(cut_string)) / self.Run.NEvents)
         return CutString('saturated', cut_string, description)
 
     def generate_pulser(self):
-        return CutString('pulser', '!pulser', 'exclude {:.1f}% pulser events'.format(100. * self.find_n_pulser('pulser') / self.Run.NEntries))
+        return CutString('pulser', '!pulser', 'exclude {:.1f}% pulser events'.format(100. * self.find_n_pulser('pulser') / self.Run.NEvents))
 
     def generate_pedestal_sigma(self, sigma=None):
         sigma = self.CutConfig['pedestal_sigma'] if sigma is None else sigma
@@ -97,7 +96,7 @@ class PadCut(Cut):
             string = '{sig2}=={sig1}'.format(sig2=sig2, sig1=self.Analysis.SignalName)
             return string
         except ValueError as err:
-            print err
+            print(err)
             return ''
 
     def generate_bucket(self, threshold=None):
@@ -143,7 +142,7 @@ class PadCut(Cut):
         h = self.Analysis.draw_signal_map(show=False)
         px = h.ProjectionX()
         format_histo(px, title='Projection X of the Signal Map', y_tit='Number of Entries', y_off=1.5)
-        self.Analysis.draw_histo(px, lm=.12, show=show)
+        self.Analysis.histo(px, lm=.12, show=show)
         py = h.ProjectionY()
         return '"{}": [{}]'.format(self.Analysis.DUT.Name, ', '.join('{:0.3f}'.format(i) for i in self.find_fid_margins(px, thresh) + self.find_fid_margins(py, thresh)))
 
@@ -161,12 +160,12 @@ class PadCut(Cut):
         show = False if show_all else show
 
         def f():
-            t = self.Analysis.info('Calculating signal threshold for bucket cut of run {run} and {d} ...'.format(run=self.Run.Number, d=self.DUT.Name), next_line=False)
+            t = self.Analysis.info('Calculating signal threshold for bucket cut of run {run} and {d} ...'.format(run=self.Run.Number, d=self.DUT.Name), endl=False)
             h = TH1F('h', 'Bucket Cut', 200, -50, 150)
             self.Analysis.Tree.Draw('{name}>>h'.format(name=self.Analysis.SignalName), self.get_bucket(), 'goff')
-            format_histo(h, x_tit='Pulse Height [mV]', y_tit='Entries', y_off=1.8, stats=0, fill_color=self.Analysis.FillColor)
-            if h.GetEntries() / self.Run.NEntries < .01:
-                log_info('Not enough bucket events ({:.1f}%)'.format(h.GetEntries() / self.Run.NEntries))
+            format_histo(h, x_tit='Pulse Height [mV]', y_tit='Entries', y_off=1.8, stats=0, fill_color=Draw.FillColor)
+            if h.GetEntries() / self.Run.NEvents < .01:
+                info('Not enough bucket events ({:.1f}%)'.format(h.GetEntries() / self.Run.NEvents))
                 self.Analysis.add_to_info(t)
                 return -30
             snr, ped = self.get_raw_snr()
@@ -177,23 +176,23 @@ class PadCut(Cut):
             fit = fit_bucket(h)
             if fit is None or any([abs(fit.GetParameter(i)) < 20 for i in [0, 3]]) or fit.GetParameter(1) < fit.GetParameter(4) or fit.GetParameter(1) > 500:
                 warning('bucket cut fit failed')
-                self.Analysis.draw_histo(h, show=show)
+                Draw.histo(h, show=show)
                 self.Analysis.add_to_info(t)
                 return -30
             sig_fit = TF1('f1', 'gaus', -50, 300)
             sig_fit.SetParameters(fit.GetParameters())
             ped_fit = TF1('f2', 'gaus(0) + gaus(3)', -50, 300)
-            ped_fit.SetParameters(*[fit.GetParameter(i) for i in xrange(3, 9)])
+            ped_fit.SetParameters(*[fit.GetParameter(i) for i in range(3, 9)])
             set_root_output(True)
 
             # real data distribution without pedestal fit
             signal = deepcopy(h)
             signal.Add(ped_fit, -1)
 
-            gr1 = self.Analysis.make_tgrapherrors('gr1', '#varepsilon_{bg}', marker_size=0.2)
-            gr2 = self.Analysis.make_tgrapherrors('gr2', '#varepsilon_{sig}', marker_size=0.2, color=2)
-            gr3 = self.Analysis.make_tgrapherrors('gr3', 'ROC Curve', marker_size=0.2)
-            gr4 = self.Analysis.make_tgrapherrors('gr4', 'Signal Error', marker_size=0.2)
+            gr1 = Draw.make_tgrapherrors(title='#varepsilon_{bg}')
+            gr2 = Draw.make_tgrapherrors(title='#varepsilon_{sig}', color=2)
+            gr3 = Draw.make_tgrapherrors(title='ROC Curve')
+            gr4 = Draw.make_tgrapherrors(title='Signal Error')
             xs = arange(-30, sig_fit.GetParameter(1), .1)
             errors = {}
             for i, x in enumerate(xs):
@@ -208,49 +207,49 @@ class PadCut(Cut):
                 gr3.SetPoint(i, sig, ped)
                 gr4.SetPoint(i, x, err1 if not use_bg else err)
             if len(errors) == 0:
-                print ValueError('errors has a length of 0')
+                print(ValueError('errors has a length of 0'))
                 self.Analysis.add_to_info(t)
                 return -30
             max_err = max(errors.items())[1]
             c = None
             if show_all:
                 set_root_output(True)
-                c = self.Analysis.make_canvas('c_all', 'Signal Threshold Overview', divide=(2, 2))
+                c = Draw.canvas('c_all', 'Signal Threshold Overview', divide=(2, 2))
             # Bucket cut plot
-            self.Analysis.draw_histo(h, '', show or show_all, lm=.135, canvas=c.cd(1) if show_all else None)
-            self.Analysis.draw_y_axis(max_err, h.GetYaxis().GetXmin(), h.GetMaximum(), 'threshold  ', off=.3, line=True)
+            self.Analysis.Draw(h, '', show or show_all, lm=.135, canvas=c.cd(1) if show_all else None)
+            Draw.y_axis(max_err, h.GetYaxis().GetXmin(), h.GetMaximum(), 'threshold  ', off=.3, line=True)
             ped_fit.SetLineStyle(2)
             ped_fit.Draw('same')
             sig_fit.SetLineColor(4)
             sig_fit.SetLineStyle(3)
             sig_fit.Draw('same')
-            self.Analysis.save_plots('BucketCut', canvas=c.cd(1) if show_all else get_last_canvas(), prnt=show)
+            self.Analysis.Draw.save_plots('BucketCut', canvas=c.cd(1) if show_all else get_last_canvas(), prnt=show)
 
             # Efficiency plot
             format_histo(gr1, title='Efficiencies', x_tit='Threshold', y_tit='Efficiency', markersize=.2)
-            l2 = self.Analysis.make_legend(.78, .3)
+            l2 = Draw.make_legend(.78, .3)
             tits = ['#varepsilon_{bg}', gr2.GetTitle()]
             [l2.AddEntry(p, tits[i], 'l') for i, p in enumerate([gr1, gr2])]
-            self.Analysis.draw_histo(gr1, '', show_all, draw_opt='apl', leg=l2, canvas=c.cd(2) if show_all else None)
-            self.Analysis.draw_histo(gr2, show=show_all, draw_opt='same', canvas=c.cd(2) if show_all else get_last_canvas())
-            self.Analysis.save_plots('Efficiencies', canvas=c.cd(2) if show_all else get_last_canvas(), prnt=show)
+            self.Analysis.Draw(gr1, '', show_all, draw_opt='apl', leg=l2, canvas=c.cd(2) if show_all else None)
+            self.Analysis.Draw(gr2, show=show_all, draw_opt='same', canvas=c.cd(2) if show_all else get_last_canvas())
+            self.Analysis.Draw.save_plots('Efficiencies', canvas=c.cd(2) if show_all else get_last_canvas(), prnt=show)
 
             # ROC Curve
             format_histo(gr3, y_tit='background fraction', x_tit='excluded signal fraction', markersize=0.2, y_off=1.2)
-            self.Analysis.draw_histo(gr3, '', show_all, gridx=True, gridy=True, draw_opt='apl', canvas=c.cd(3) if show_all else None)
-            p = self.Analysis.make_tgrapherrors('gr', 'working point', color=2)
+            self.Analysis.Draw(gr3, '', show_all, gridx=True, gridy=True, draw_opt='apl', canvas=c.cd(3) if show_all else None)
+            p = Draw.make_tgrapherrors('gr', 'working point', color=2)
             p.SetPoint(0, 1 - sig_fit.Integral(-50, max_err) / signal.Integral(), ped_fit.Integral(-50, max_err) / ped_fit.Integral(-50, 200))
             sleep(.1)
-            latex = self.Analysis.draw_tlatex(p.GetX()[0], p.GetY()[0] + .01, 'Working Point', color=2, size=.04)
+            latex = Draw.tlatex(p.GetX()[0], p.GetY()[0] + .01, 'Working Point', color=2, size=.04)
             p.GetListOfFunctions().Add(latex)
-            self.Analysis.draw_histo(p, show=show_all, canvas=c.cd(3) if show_all else get_last_canvas(), draw_opt='p')
-            self.Analysis.save_plots('ROC_Curve', canvas=c.cd(3) if show_all else get_last_canvas(), prnt=show)
+            self.Analysis.Draw(p, show=show_all, canvas=c.cd(3) if show_all else get_last_canvas(), draw_opt='p')
+            self.Analysis.Draw.save_plots('ROC_Curve', canvas=c.cd(3) if show_all else get_last_canvas(), prnt=show)
 
             # Error Function plot
             format_histo(gr4, x_tit='Threshold', y_tit='1 / error', y_off=1.4)
-            self.Analysis.save_histo(gr4, 'ErrorFunction', show_all, gridx=True, draw_opt='al', canvas=c.cd(4) if show_all else None, prnt=show)
+            self.Analysis.Draw(gr4, 'ErrorFunction', show_all, gridx=True, draw_opt='al', canvas=c.cd(4) if show_all else None, prnt=show)
 
-            self.Analysis.Objects.append([sig_fit, ped_fit, gr2, c])
+            self.Analysis.Draw.add([sig_fit, ped_fit, gr2, c])
 
             self.Analysis.add_to_info(t)
             return max_err
@@ -261,10 +260,10 @@ class PadCut(Cut):
         picklepath = self.Analysis.make_pickle_path('Pedestal', 'Cut', self.Run.Number, self.Channel)
 
         def func():
-            t = self.Analysis.info('generating pedestal cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), next_line=False)
+            t = self.Analysis.info('generating pedestal cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), endl=False)
             h1 = TH1F('h_pdc', 'Pedestal Distribution', 600, -150, 150)
             self.Analysis.Tree.Draw('{name}>>h_pdc'.format(name=self.Analysis.PedestalName), '', 'goff')
-            fit_pars = fit_fwhm(h1, do_fwhm=True, draw=False)
+            fit_pars = fit_fwhm(h1, show=False)
             self.Analysis.add_to_info(t)
             return fit_pars
 
@@ -279,12 +278,12 @@ class PadCut(Cut):
 
         def func():
             self.Analysis.Tree.Draw(self.Analysis.SignalName, '', 'goff', 5000)
-            xvals = sorted([self.Analysis.Tree.GetV1()[i] for i in xrange(5000)])
+            xvals = sorted([self.Analysis.Tree.GetV1()[i] for i in range(5000)])
             x_range = [xvals[0] - 5, xvals[-5]]
             h = self.Analysis.draw_signal_distribution(show=show, cut=self.generate_fiducial()(), x_range=x_range, bin_width=1)
             s = TSpectrum(3)
             s.Search(h)
-            peaks = [s.GetPositionX()[i] for i in xrange(s.GetNPeaks())]
+            peaks = [s.GetPositionX()[i] for i in range(s.GetNPeaks())]
             h.GetXaxis().SetRangeUser(peaks[0], peaks[-1])
             x_start = h.GetBinCenter(h.GetMinimumBin())
             h.GetXaxis().UnZoom()
@@ -297,7 +296,7 @@ class PadCut(Cut):
 
     def fit_cft(self, show=False, redo=False):
         def f():
-            t = self.Analysis.info('generating cft cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), next_line=False)
+            t = self.Analysis.info('generating cft cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), endl=False)
             cut = self.generate_custom(exclude=['cft'], prnt=False, name='cft_cut')
             h = self.Analysis.Timing.draw_cft(cut=cut, show=show)
             fit = h.Fit('gaus', 'qs')
@@ -307,7 +306,7 @@ class PadCut(Cut):
 
     def calc_timing_range(self, redo=False):
         def f():
-            t = self.Analysis.info('generating timing cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), next_line=False)
+            t = self.Analysis.info('generating timing cut for {dia} of run {run} ...'.format(run=self.Run.Number, dia=self.Analysis.DUT.Name), endl=False)
             cut = self.generate_custom(exclude=['timing'], prnt=False, name='timing_cut')
             t_correction = self.Analysis.Timing.calc_fine_correction(redo=redo)
             h = self.Analysis.Timing.draw_peaks(show=False, cut=cut, fine_corr=t_correction != '0', prnt=False, redo=redo)
